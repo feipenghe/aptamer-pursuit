@@ -1,9 +1,8 @@
 # Parse the MHC Allele and Peptide Text File
 from itertools import groupby
 
-bdata_file = "/Users/aishwaryamandyam/Documents/Research/Masters MISL/aptamer-pursuit/bdata.20130222.mhci.txt"
-alleles_file = "/Users/aishwaryamandyam/Documents/Research/Masters " \
-                "MISL/aptamer-pursuit/alleles.txt"
+bdata_file = "bdata.20130222.mhci.txt"
+alleles_file = "alleles.txt"
 
 
 '''
