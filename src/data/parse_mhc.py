@@ -2,49 +2,47 @@
 from itertools import groupby
 
 bdata_file = "bdata.20130222.mhci.txt"
-alleles_file = "alleles.txt"
+alleles_file = "human_allele_seq.txt"
 
 
 '''
-Explores the bdata_file
+Maps a given allele to a list of peptides that will bind with it
 '''
-def find_alleles():
-    alleles = set()
-    species = set()
-
-    spec_to_prefix = {}
+def allele_to_peptide():
+    allele_to_peptide = {}
 
     file = open(bdata_file)
     data = file.readlines()[1:]
     for line in data:
         parsed = line.split()
         allele = parsed[1]
-        spec = parsed[0]
+        peptide_seq = parsed[3]
 
-        if spec not in spec_to_prefix:
-            spec_to_prefix[spec] = []
-        spec_to_prefix[spec].append(allele)
+        if allele not in allele_to_peptide:
+            allele_to_peptide[allele] = []
+        allele_to_peptide[allele].append(peptide_seq)
 
-        species.add(spec)
-        alleles.add(allele)
 
-    print("Available Species: ", species)
-
-    return spec_to_prefix
+    return allele_to_peptide
 
 '''
 Construct a mapping of allele to amino-acid sequence
 @param: alleles_file: the file containing the FASTA alleles
 '''
-def allele_to_aminos(alleles_file):
+def allele_to_aminos():
     allele_to_amino = {}
 
-    fasta_iterator = generate_fasta_iterator(alleles_file)
-    for ff in fasta_iterator:
-        header, seq = ff
-        parsed_header = header.split(',')
-        allele_name = parsed_header[1]
-        #allele_to_amino[allele_name.replace(':', '')] = seq
+    file = open(alleles_file)
+    data = file.read()
+    for pair in data.split("\n\n"):
+        parsed = pair.split("\n")
+        print(str(parsed))
+        allele_name = parsed[0]
+        sequence = ""
+        for i in range(1, len(parsed)):
+            sequence += parsed[i]
+
+        allele_to_amino[allele_name] = sequence
 
     return allele_to_amino
 
@@ -81,15 +79,13 @@ def generate_dataset(allele_to_seq_dict):
         parsed = line.split()
         allele_name = parsed[1]
         if allele_name not in allele_to_seq_dict.keys():
-            #print("Allele: ", allele_name)
+            print("Allele not available: ", allele_name)
             continue
         allele_seq = allele_to_seq_dict[allele_name]
         peptide_seq = parsed[3]
         binding_affinity = parsed[5]
 
         key = (allele_seq, peptide_seq)
-        print("Key: ", key)
-        print("Affinity: ", binding_affinity)
         allele_to_sequence[key] = binding_affinity
 
     return allele_to_sequence
@@ -97,5 +93,13 @@ def generate_dataset(allele_to_seq_dict):
 
 
 
-dict = allele_to_aminos(alleles_file)
-data = generate_dataset(dict)
+a = allele_to_aminos()
+b = allele_to_peptide()
+
+intersection = set(a.keys()).intersection(set(b.keys()))
+print("Intersection: ", intersection)
+
+#allele_to_seq = allele_to_aminos(alleles_file)
+#for a in allele_to_seq.keys():
+#    print("Available allele: ", a)
+#data = generate_dataset(allele_to_seq)
