@@ -1,10 +1,15 @@
 # A bigram predicts the likelihood of the current element based on the previous element.
+import json
 
 # Construct a training dataset:
-corpus = ["He said thank you.", "He said bye as he walked through the door.", "He went to San "
-        "Diego.", "San Diego has nice weather.", "It is raining in San Francisco."]
+dataset_file = "../data/bigram_dataset.json"
 
-# Probabilities: (Count (wp wn))/(Count (wp))
+with open(dataset_file, 'r') as f:
+    bigram_dataset = json.load(f)
+    for allele in bigram_dataset:
+        print("Allele: ", allele)
+
+# Generate bigrams for each allele in the dataset
 
 
 
