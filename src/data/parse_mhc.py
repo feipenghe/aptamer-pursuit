@@ -99,7 +99,3 @@ b = allele_to_peptide()
 intersection = set(a.keys()).intersection(set(b.keys()))
 print("Intersection: ", intersection)
 
-#allele_to_seq = allele_to_aminos(alleles_file)
-#for a in allele_to_seq.keys():
-#    print("Available allele: ", a)
-#data = generate_dataset(allele_to_seq)
