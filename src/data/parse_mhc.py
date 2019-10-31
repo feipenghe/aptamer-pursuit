@@ -66,7 +66,7 @@ def generate_dataset(allele_to_aminos, allele_to_peptides):
 Generates a bigram dataset
 (allele_name, list of peptides that will bind)
 '''
-def generate_bigram_dataset(allele_to_aminos, allele_to_peptides):
+def generate_ngram_dataset(allele_to_aminos, allele_to_peptides):
     dataset = {}
 
     for allele in allele_to_peptides:
@@ -86,12 +86,12 @@ allele_to_peptides = allele_to_peptide()
 # This is the full dataset
 dataset = generate_dataset(allele_to_aminos, allele_to_peptides)
 # Bigram dataset
-bigram_dataset = generate_bigram_dataset(allele_to_aminos, allele_to_peptides)
+bigram_dataset = generate_ngram_dataset(allele_to_aminos, allele_to_peptides)
 
 with open("human_dataset.json", 'w') as f:
     json.dump(dataset, f)
 
-with open("bigram_dataset.json", 'w') as f:
+with open("ngram_dataset.json", 'w') as f:
     json.dump(bigram_dataset, f)
 
 
