@@ -7,39 +7,41 @@ import random
 dataset_file = "../data/ngram_dataset.json"
 
 with open(dataset_file, 'r') as f:
-    bigram_dataset = json.load(f)
+    ngram_dataset = json.load(f)
 
-# Generate bigrams for each allele in the dataset
+n = 3
+
+# Generate predicted protein for each allele in the dataset separately
 predicted_proteins = []
-for allele in bigram_dataset:
+for allele in ngram_dataset:
 
     sentences = []
-    proteins = bigram_dataset[allele]
+    proteins = ngram_dataset[allele]
     for p in proteins:
         sentences.append(p)
 
     # Generates the bigrams for this particular peptide set for this allele
-    bigrams = {}
+    ngrams = {}
     for sentence in sentences:
-        for i in range(len(sentence) - 2):
-            seq = str(sentence[i:i+2])
-            if seq not in bigrams.keys():
-                bigrams[seq] = []
-            bigrams[seq].append(sentence[i+2])
+        for i in range(len(sentence) - n):
+            seq = str(sentence[i:i+n])
+            if seq not in ngrams.keys():
+                ngrams[seq] = []
+            ngrams[seq].append(sentence[i+n])
 
     # Generate the best 8 amino acid protein sequence
     # with a given start letters
-    start = sentences[0][0:2]
+    start = sentences[0][0:n]
     output = start
     for i in range(6):
-        if start not in bigrams.keys():
+        if start not in ngrams.keys():
             break
-        possible_chars = bigrams[start]
+        possible_chars = ngrams[start]
         next_char = possible_chars[random.randrange(len(possible_chars))]
         output += next_char
-        start = output[len(output)-2:len(output)]
+        start = output[len(output)-n:len(output)]
     predicted_proteins.append(output)
-    print("Allele: " + str(allele) + ", Predicted Bigram Protein: " + str(output))
+    print("Allele: " + str(allele) + ", Predicted Ngram Protein: " + str(output))
 
 def generate_stats(predicted_proteins):
     # Shortest Length
