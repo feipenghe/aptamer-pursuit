@@ -10,6 +10,7 @@ with open(dataset_file, 'r') as f:
     bigram_dataset = json.load(f)
 
 # Generate bigrams for each allele in the dataset
+predicted_proteins = []
 for allele in bigram_dataset:
 
     sentences = []
@@ -27,7 +28,7 @@ for allele in bigram_dataset:
             bigrams[seq].append(sentence[i+2])
 
     # Generate the best 8 amino acid protein sequence
-    # with a given tart letter
+    # with a given start letters
     start = sentences[0][0:2]
     output = start
     for i in range(6):
@@ -37,8 +38,19 @@ for allele in bigram_dataset:
         next_char = possible_chars[random.randrange(len(possible_chars))]
         output += next_char
         start = output[len(output)-2:len(output)]
-
+    predicted_proteins.append(output)
     print("Allele: " + str(allele) + ", Predicted Bigram Protein: " + str(output))
+
+def generate_stats(predicted_proteins):
+    # Shortest Length
+    shortest_length = 8
+    for i in range(len(predicted_proteins)):
+        shortest_length = min(shortest_length, len(predicted_proteins[i]))
+    # Longest Length = 8
+
+    print("Shortest Length Peptide: ", shortest_length)
+
+generate_stats(predicted_proteins)
 
 
 
