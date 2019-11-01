@@ -48,8 +48,8 @@ def predict_proteins(n=3, seq_length=8):
             output += next_char
             start = output[len(output)-n:len(output)]
         predicted_proteins.append(output)
-        print("Allele: " + str(allele) + ", Predicted Ngram Protein: " + str(output))
-        return predicted_proteins
+        print("Allele: " + str(allele) + ", Predicted Protein: " + str(output))
+    return predicted_proteins
 
 '''
 Generate statistics about the proteins that I predicted.
@@ -65,12 +65,12 @@ def generate_stats(predicted_proteins, seq_length):
         shortest_length = min(shortest_length, len(predicted_proteins[i]))
         longest_length = max(longest_length, len(predicted_proteins[i]))
 
-
+    print("-----Stats-----")
     print("Shortest Length Peptide: ", shortest_length)
     print("Longest Length Peptide: ", longest_length)
 
 
-predicted_proteins = predict_proteins(n=3, seq_length=8)
+predicted_proteins = predict_proteins(n=1, seq_length=8)
 generate_stats(predicted_proteins, seq_length=8)
 
 
