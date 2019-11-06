@@ -2,6 +2,8 @@
 import json
 import nltk
 import random
+import numpy as np
+import math
 
 # Construct a training dataset:
 dataset_file = "../data/ngram_dataset.json"
@@ -9,6 +11,9 @@ dataset_file = "../data/ngram_dataset.json"
 with open(dataset_file, 'r') as f:
     ngram_dataset = json.load(f)
 
+# k = k-gram value, d = number of features
+k = 3
+d = 100
 
 '''
 Generate predicted protein for each allele in the dataset separately
@@ -16,40 +21,84 @@ Generate predicted protein for each allele in the dataset separately
 @param: seq_length = the length of peptide sequence to generate. 
 '''
 def predict_proteins(n=3, seq_length=8):
-    predicted_proteins = []
+
     for allele in ngram_dataset:
-
+        # Sentences are all the peptides that bound to this allele
         sentences = []
+        # These are protein/binding affinity pairs
         proteins = ngram_dataset[allele]
-        for p in proteins:
-            sentences.append(p)
 
-        # Generates the ngrams for this particular peptide set for this allele, with n value
-        ngrams = {}
-        for sentence in sentences:
-            for i in range(len(sentence) - n):
-                seq = str(sentence[i:i+n])
-                if seq not in ngrams.keys():
-                    ngrams[seq] = []
-                ngrams[seq].append(sentence[i+n])
+        # Divide them into train/test sets
+        num_samples = len(proteins)
+        if num_samples < 20:
+            continue
+        training_set = proteins[:int(num_samples*0.8)]
+        testing_set = proteins[int(num_samples*0.8):]
 
-        # Generate a "seq_length" amino acid protein sequence
-        # with a given start letters
+        # Generate features using ngram structure
+        training_peptides = [p for (p,b) in training_set]
+        train_y = [float(b) for (p, b) in training_set]
+        testing_peptides = [p for (p,b) in testing_set]
+        test_y = [float(b) for (p, b) in testing_set]
+        features = []
+        for i in range(d):
+            # Find a random sequence in the training set
+            seq = random.choice(training_peptides)
 
-        # For now, I'm just using the start of the first peptide sequence that sticks to this allele
-        # TODO: get the peptide sequence that binds the best to this allele
-        start = sentences[0][0:n]
-        output = start
-        for i in range(seq_length - n):
-            if start not in ngrams.keys():
-                break
-            possible_chars = ngrams[start]
-            next_char = possible_chars[random.randrange(len(possible_chars))]
-            output += next_char
-            start = output[len(output)-n:len(output)]
-        predicted_proteins.append(output)
-        print("Allele: " + str(allele) + ", Predicted Protein: " + str(output))
-    return predicted_proteins
+            # Find a random subsection of k elements from this sequence
+            start = random.randint(0, len(seq) - k)
+            feature = seq[start:start+k]
+
+            # Add it to the list of features here
+            features.append(feature)
+
+        # Generate train and test matrices
+        train_features = np.zeros((len(training_peptides), d))
+        test_features = np.zeros((len(testing_set), d))
+
+        train_ones = 0
+        for i in range(len(training_peptides)):
+            sequence = training_peptides[i]
+            for j in range(len(features)):
+                feature = features[j]
+                train_features[i, j] = 1 if str(feature) in str(sequence) else 0
+                if train_features[i, j] == 1:
+                    train_ones += 1
+
+        for i in range(len(testing_peptides)):
+            sequence = testing_peptides[i]
+            for j in range(len(features)):
+                feature = features[j]
+                test_features[i, j] = 1 if feature in sequence else 0
+
+        # Use a linear model here to calculate wx+b for the training set
+        # Calculate w, with a gradient based method
+        w = np.random.randn(d)
+        lr = 0.01
+        for i in range(20):
+            derivative = 0
+            for i in range(len(training_set)):
+                row = train_features[i]
+                binding_affinity = float(train_y[i])
+                mult = binding_affinity - np.matmul(np.transpose(row), w, dtype=float)
+
+                derivative += row * mult
+            derivative *= -1
+
+            # update the weight
+            w -= lr * derivative
+
+
+        # TODO: skipping the regularizer for now
+        b = random.random()
+
+
+        train_loss = np.min(np.power(np.matmul(w, np.transpose(train_features)) - np.log(train_y), 2))
+
+        # Calculate the test loss
+        test_loss = np.min(np.power(np.matmul(w, np.transpose(test_features)) - np.log(test_y), 2))
+
+        print("Allele: " + str(allele) + ", Train Loss: " + str(train_loss) + ", Test Loss: " + str(test_loss))
 
 '''
 Generate statistics about the proteins that I predicted.
@@ -71,7 +120,7 @@ def generate_stats(predicted_proteins, seq_length):
 
 
 predicted_proteins = predict_proteins(n=1, seq_length=8)
-generate_stats(predicted_proteins, seq_length=8)
+#generate_stats(predicted_proteins, seq_length=8)
 
 
 
