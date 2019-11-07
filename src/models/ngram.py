@@ -1,9 +1,9 @@
 # A bigram predicts the likelihood of the current element based on the previous element.
 import json
-import nltk
 import random
 import numpy as np
 import math
+from sklearn import linear_model, metrics
 
 # Construct a training dataset:
 dataset_file = "../data/ngram_dataset.json"
@@ -12,19 +12,14 @@ with open(dataset_file, 'r') as f:
     ngram_dataset = json.load(f)
 
 # k = k-gram value, d = number of features
-k = 4
+k = 3
 d = 200
-
+lr = 0.01
 '''
-Generate predicted protein for each allele in the dataset separately
-@param: n = the number of characters to use in predictions. (i.e. bigram means n=2)
-@param: seq_length = the length of peptide sequence to generate. 
+Generate and evaluate the performance of features to predict whether a protein will bind to a specific allele. 
 '''
-def predict_proteins(n=3, seq_length=8):
-    sum_of_losses = 0.0
+def predict_proteins():
     for allele in ngram_dataset:
-        # Sentences are all the peptides that bound to this allele
-        sentences = []
         # These are protein/binding affinity pairs
         proteins = ngram_dataset[allele]
 
@@ -37,9 +32,9 @@ def predict_proteins(n=3, seq_length=8):
 
         # Generate features using ngram structure
         training_peptides = [p for (p,b) in training_set]
-        train_y = [float(b) for (p, b) in training_set]
+        train_y = [np.log10(float(b)) for (p, b) in training_set]
         testing_peptides = [p for (p,b) in testing_set]
-        test_y = [float(b) for (p, b) in testing_set]
+        test_y = [np.log10(float(b)) for (p, b) in testing_set]
         features = []
         for i in range(d):
             # Find a random sequence in the training set
@@ -71,37 +66,29 @@ def predict_proteins(n=3, seq_length=8):
                 feature = features[j]
                 test_features[i, j] = 1 if feature in sequence else 0
 
-        # Use a linear model here to calculate wx+b for the training set
-        # Calculate w, with a gradient based method
-        w = np.random.randn(d)
-        lr = 0.01
-        for i in range(20):
-            derivative = 0
-            for i in range(len(training_set)):
-                row = train_features[i]
-                binding_affinity = float(train_y[i])
-                mult = binding_affinity - np.matmul(np.transpose(row), w, dtype=float)
+        # Use a linear model here to calculate the best parameters for the linear regression model
+        regularization_params = [0.02, 0.03, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1]
+        lowest_train_MSE = None
+        best_alpha = None
+        for a in regularization_params:
+            lasso_model = linear_model.Lasso(alpha=a, max_iter=100)
+            lasso_model.fit(train_features, train_y)
 
-                derivative += row * mult
-            derivative *= -1
+            lasso_predict = lasso_model.predict(train_features)
+            lasso_true = train_y
+            mse = metrics.mean_squared_error(lasso_true, lasso_predict)
+            if lowest_train_MSE is None or mse < lowest_train_MSE:
+                lowest_train_MSE = mse
+                best_alpha = a
 
-            # update the weight
-            w -= lr * derivative
+        # Calculate the train MSE
+        lasso_model = linear_model.Lasso(alpha=best_alpha)
+        lasso_model.fit(train_features, train_y)
+        lasso_predict = lasso_model.predict(test_features)
+        lasso_true = test_y
+        test_mse = metrics.mean_squared_error(lasso_true, lasso_predict)
 
-
-        # TODO: skipping the regularizer for now
-        b = random.random()
-
-
-        train_loss = np.min(np.power(np.matmul(w, np.transpose(train_features)) - np.log(train_y), 2))
-
-        # Calculate the test loss
-        #TODO: this doesn't seem like the best loss.
-        test_loss = np.min(np.power(np.matmul(w, np.transpose(test_features)) - np.log(test_y), 2))
-
-        sum_of_losses += test_loss
-
-        print("Allele: " + str(allele) + ", Train Loss: " + str(train_loss) + ", Test Loss: " + str(test_loss) + " Num Samples: " + str(num_samples))
+        print("Allele: " + str(allele) + ", Train MSE: " + str(lowest_train_MSE) + ", Test MSE: " + str(test_mse) + ", Num Samples: " + str(num_samples))
 
 '''
 Generate statistics about the proteins that I predicted.
@@ -122,7 +109,7 @@ def generate_stats(predicted_proteins, seq_length):
     print("Longest Length Peptide: ", longest_length)
 
 
-predicted_proteins = predict_proteins(n=1, seq_length=8)
+predicted_proteins = predict_proteins()
 #generate_stats(predicted_proteins, seq_length=8)
 
 
