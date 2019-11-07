@@ -12,8 +12,8 @@ with open(dataset_file, 'r') as f:
     ngram_dataset = json.load(f)
 
 # k = k-gram value, d = number of features
-k = 3
-d = 100
+k = 4
+d = 200
 
 '''
 Generate predicted protein for each allele in the dataset separately
@@ -21,7 +21,7 @@ Generate predicted protein for each allele in the dataset separately
 @param: seq_length = the length of peptide sequence to generate. 
 '''
 def predict_proteins(n=3, seq_length=8):
-
+    sum_of_losses = 0.0
     for allele in ngram_dataset:
         # Sentences are all the peptides that bound to this allele
         sentences = []
@@ -96,9 +96,12 @@ def predict_proteins(n=3, seq_length=8):
         train_loss = np.min(np.power(np.matmul(w, np.transpose(train_features)) - np.log(train_y), 2))
 
         # Calculate the test loss
+        #TODO: this doesn't seem like the best loss.
         test_loss = np.min(np.power(np.matmul(w, np.transpose(test_features)) - np.log(test_y), 2))
 
-        print("Allele: " + str(allele) + ", Train Loss: " + str(train_loss) + ", Test Loss: " + str(test_loss))
+        sum_of_losses += test_loss
+
+        print("Allele: " + str(allele) + ", Train Loss: " + str(train_loss) + ", Test Loss: " + str(test_loss) + " Num Samples: " + str(num_samples))
 
 '''
 Generate statistics about the proteins that I predicted.
