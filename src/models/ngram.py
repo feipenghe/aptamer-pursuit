@@ -12,13 +12,15 @@ with open(dataset_file, 'r') as f:
     ngram_dataset = json.load(f)
 
 # k = k-gram value, d = number of features
-k = 3
-d = 200
-lr = 0.01
+k = 6
+d = 300
+regularization_params = [0.02, 0.03, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1]
 '''
 Generate and evaluate the performance of features to predict whether a protein will bind to a specific allele. 
 '''
-def predict_proteins():
+def predict_proteins(k, d, regularization_params):
+    total_train_MSE = 0.0
+    total_test_MSE = 0.0
     for allele in ngram_dataset:
         # These are protein/binding affinity pairs
         proteins = ngram_dataset[allele]
@@ -67,7 +69,7 @@ def predict_proteins():
                 test_features[i, j] = 1 if feature in sequence else 0
 
         # Use a linear model here to calculate the best parameters for the linear regression model
-        regularization_params = [0.02, 0.03, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1]
+
         lowest_train_MSE = None
         best_alpha = None
         for a in regularization_params:
@@ -85,10 +87,15 @@ def predict_proteins():
         lasso_model = linear_model.Lasso(alpha=best_alpha)
         lasso_model.fit(train_features, train_y)
         lasso_predict = lasso_model.predict(test_features)
+
         lasso_true = test_y
         test_mse = metrics.mean_squared_error(lasso_true, lasso_predict)
 
-        print("Allele: " + str(allele) + ", Train MSE: " + str(lowest_train_MSE) + ", Test MSE: " + str(test_mse) + ", Num Samples: " + str(num_samples))
+        total_train_MSE += lowest_train_MSE
+        total_test_MSE += test_mse
+
+    print("D: " + str(d) + " K:" + str(k))
+    return (d, k, total_train_MSE, total_test_MSE)
 
 '''
 Generate statistics about the proteins that I predicted.
@@ -109,8 +116,24 @@ def generate_stats(predicted_proteins, seq_length):
     print("Longest Length Peptide: ", longest_length)
 
 
-predicted_proteins = predict_proteins()
-#generate_stats(predicted_proteins, seq_length=8)
+def run_experiments():
+    # k --> (d, total_train_mse, total_test_mse)
+    experiments = {}
+    for k in range(2, 7):
+        for d in range(100, 500, 100):
+            d, k, total_train_mse, total_test_mse = predict_proteins(k, d, regularization_params)
+            if k not in experiments:
+                experiments[k] = []
+            experiments[k].append((d, total_train_mse, total_test_mse))
+
+
+    with open("../../experiments/ngram.json", 'w') as f:
+        json.dump(experiments, f)
+
+
+run_experiments()
+
+
 
 
 
