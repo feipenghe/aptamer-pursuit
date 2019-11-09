@@ -2,7 +2,6 @@
 import json
 import random
 import numpy as np
-import math
 from sklearn import linear_model, metrics
 
 # Construct a training dataset:
@@ -14,7 +13,7 @@ with open(dataset_file, 'r') as f:
 # k = k-gram value, d = number of features
 k = 6
 d = 300
-regularization_params = [0.02, 0.03, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1]
+regularization_params = [0, 0.02, 0.03, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1]
 '''
 Generate and evaluate the performance of features to predict whether a protein will bind to a specific allele. 
 '''
@@ -70,32 +69,23 @@ def predict_proteins(k, d, regularization_params):
 
         # Use a linear model here to calculate the best parameters for the linear regression model
 
-        train_mse = None
-        best_alpha = None
-        for a in regularization_params:
-            lasso_model = linear_model.Lasso(alpha=a, max_iter=100)
-            lasso_model.fit(train_features, train_y)
+        model = linear_model.Ridge()
+        model.fit(train_features, train_y)
 
-            lasso_predict = lasso_model.predict(train_features)
-            lasso_true = train_y
-            mse = metrics.mean_squared_error(lasso_true, lasso_predict)
-            if train_mse is None or mse < train_mse:
-                lowest_train_MSE = mse
-                best_alpha = a
+        train_predict = model.predict(train_features)
+        gt_train = train_y
+        train_mse = metrics.mean_squared_error(train_predict, gt_train)
 
-        # Calculate the train MSE
-        lasso_model = linear_model.Lasso(alpha=best_alpha)
-        lasso_model.fit(train_features, train_y)
-        lasso_predict = lasso_model.predict(test_features)
+        test_predict = model.predict(test_features)
 
-        lasso_true = test_y
-        test_mse = metrics.mean_squared_error(lasso_true, lasso_predict)
+        gt_test = test_y
+        test_mse = metrics.mean_squared_error(test_predict, gt_test)
 
-        total_train_MSE += lowest_train_MSE
+        total_train_MSE += train_mse
         total_test_MSE += test_mse
 
-        print("Allele: " + str(allele) + " Train MSE: " + str(lowest_train_MSE) + " Test MSE: " + str(test_mse))
-
+        #print("Allele: " + str(allele) + " Train MSE: " + str(train_mse) + " Test MSE: " + str(test_mse))
+    print("D: " + str(d) + " K: " + str(k))
     return (d, k, total_train_MSE, total_test_MSE)
 
 '''
@@ -121,7 +111,7 @@ def run_experiments():
     # k --> (d, total_train_mse, total_test_mse)
     experiments = {}
     for k in range(2, 7):
-        for d in range(100, 500, 100):
+        for d in range(100, 1000, 100):
             d, k, total_train_mse, total_test_mse = predict_proteins(k, d, regularization_params)
             if k not in experiments:
                 experiments[k] = []
@@ -132,8 +122,8 @@ def run_experiments():
         json.dump(experiments, f)
 
 
-#run_experiments()
-predict_proteins(k=3, d=200, regularization_params=regularization_params)
+run_experiments()
+#predict_proteins(k=3, d=400, regularization_params=regularization_params)
 
 
 
