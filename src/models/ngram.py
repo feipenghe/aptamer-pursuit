@@ -70,7 +70,7 @@ def predict_proteins(k, d, regularization_params):
 
         # Use a linear model here to calculate the best parameters for the linear regression model
 
-        lowest_train_MSE = None
+        train_mse = None
         best_alpha = None
         for a in regularization_params:
             lasso_model = linear_model.Lasso(alpha=a, max_iter=100)
@@ -79,7 +79,7 @@ def predict_proteins(k, d, regularization_params):
             lasso_predict = lasso_model.predict(train_features)
             lasso_true = train_y
             mse = metrics.mean_squared_error(lasso_true, lasso_predict)
-            if lowest_train_MSE is None or mse < lowest_train_MSE:
+            if train_mse is None or mse < train_mse:
                 lowest_train_MSE = mse
                 best_alpha = a
 
@@ -94,7 +94,8 @@ def predict_proteins(k, d, regularization_params):
         total_train_MSE += lowest_train_MSE
         total_test_MSE += test_mse
 
-    print("D: " + str(d) + " K:" + str(k))
+        print("Allele: " + str(allele) + " Train MSE: " + str(lowest_train_MSE) + " Test MSE: " + str(test_mse))
+
     return (d, k, total_train_MSE, total_test_MSE)
 
 '''
@@ -131,8 +132,8 @@ def run_experiments():
         json.dump(experiments, f)
 
 
-run_experiments()
-
+#run_experiments()
+predict_proteins(k=3, d=200, regularization_params=regularization_params)
 
 
 
