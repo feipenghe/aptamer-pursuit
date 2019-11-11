@@ -5,7 +5,7 @@ import numpy as np
 from sklearn import linear_model, metrics
 from scipy import stats
 import random
-import matplotlib.pyplot as plt
+import re
 
 # Construct a training dataset:
 dataset_file = "../data/ngram_dataset.json"
@@ -27,6 +27,8 @@ def predict_proteins(k, d):
     for allele in ngram_dataset:
         # These are protein/binding affinity pairs
         proteins = ngram_dataset[allele]
+        print("Allele: ", allele)
+        print("Num Proteins: ", len(proteins))
 
         # Divide them into train/test sets
         num_samples = len(proteins)
@@ -40,6 +42,7 @@ def predict_proteins(k, d):
         testing_set = proteins[int(num_samples*0.8):]
 
         # Generate features using ngram structure
+        print("Generating Features")
         training_peptides = [p for (p,b) in training_set]
         train_y = [np.log10(float(b)) for (p, b) in training_set]
         testing_peptides = [p for (p,b) in testing_set]
@@ -70,24 +73,54 @@ def predict_proteins(k, d):
         train_features = np.zeros((len(training_peptides), d))
         test_features = np.zeros((len(testing_set), d))
 
-        train_ones = 0
+        print("Computing train set")
         for i in range(len(training_peptides)):
             sequence = training_peptides[i]
+            if i % 100 == 0:
+                print("I: ", i)
             for j in range(len(features)):
                 feature, quartile = features[j]
                 # If it's in the correct quartile, it's 1
-                
-                train_features[i, j] = 1 if str(feature) in str(sequence) else 0
-                if train_features[i, j] == 1:
-                    train_ones += 1
+                starts = [m.start() for m in re.finditer(feature, sequence)]
+                for s in starts:
+                    # Each s is an index of the beginning of this features
+                    # If one of them appears in the correct quartile, then this is 1
+                    pctg = (s+1)/len(sequence)
+                    if pctg <= 0.25 and quartile == 1:
+                        train_features[i, j] = 1
+                    elif (pctg > 0.25 and pctg <= 0.5) and quartile == 2:
+                        train_features[i, j] = 1
+                    elif (pctg > 0.5 and pctg <= 0.75) and quartile == 3:
+                        train_features[i, j] = 1
+                    elif pctg > 0.75 and quartile == 4:
+                        train_features[i, j] = 1
+                    else:
+                        train_features[i, j] = 0
 
+        print("Computing test set")
         for i in range(len(testing_peptides)):
             sequence = testing_peptides[i]
             for j in range(len(features)):
-                feature = features[j]
-                test_features[i, j] = 1 if feature in sequence else 0
+                feature, quartile = features[j]
+                # If it's in the correct quartile, it's 1
+                starts = [m.start() for m in re.finditer(feature, sequence)]
+                for s in starts:
+                    # Each s is an index of the beginning of this features
+                    # If one of them appears in the correct quartile, then this is 1
+                    pctg = (s + 1) / len(sequence)
+                    if pctg <= 0.25 and quartile == 1:
+                        test_features[i, j] = 1
+                    elif (pctg > 0.25 and pctg <= 0.5) and quartile == 2:
+                        test_features[i, j] = 1
+                    elif (pctg > 0.5 and pctg <= 0.75) and quartile == 3:
+                        test_features[i, j] = 1
+                    elif pctg > 0.75 and quartile == 4:
+                        test_features[i, j] = 1
+                    else:
+                        test_features[i, j] = 0
 
         # Use a linear model here to calculate the best parameters for the linear regression model
+        print("Fitting models")
         model = linear_model.Ridge()
         model.fit(train_features, train_y)
 
@@ -96,7 +129,6 @@ def predict_proteins(k, d):
         train_mse = metrics.mean_squared_error(train_predict, gt_train)
 
         test_predict = model.predict(test_features)
-
         gt_test = test_y
 
         test_mse = metrics.mean_squared_error(test_predict, gt_test)
@@ -104,7 +136,9 @@ def predict_proteins(k, d):
         total_train_MSE += train_mse
         total_test_MSE += test_mse
 
-        #print("Allele: " + str(allele) + " Train MSE: " + str(train_mse) + " Test MSE: " + str(test_mse))
+        print("Allele: " + str(allele) + " Train MSE: " + str(train_mse) + " Test MSE: " + str(test_mse))
+
+    print("D: " + str(d) + " K: " + str(k))
 
     return (d, k, total_train_MSE, total_test_MSE)
 
@@ -142,11 +176,11 @@ def run_experiments():
         json.dump(experiments, f)
 
 
-predict_proteins(2, 100)
+#predict_proteins(2, 100)
 #run_experiments()
-#predict_proteins(k=4, d=1000)
+predict_proteins(k=4, d=1000)
 
-#gt, predict= predict_proteins(k=4, d=1000)
+#gt, predict = predict_proteins(k=4, d=1000)
 #r = stats.pearsonr(gt, list(predict))
 #print("R squared: ", pow(r[0], 2))
 #with open("../../experiments/HLA-A*02:01-predict.json", 'w') as f:
