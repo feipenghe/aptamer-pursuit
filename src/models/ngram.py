@@ -6,6 +6,7 @@ from sklearn import linear_model, metrics
 from scipy import stats
 import random
 import re
+from progressbar import ProgressBar
 
 # Construct a training dataset:
 dataset_file = "../data/ngram_dataset.json"
@@ -13,22 +14,16 @@ dataset_file = "../data/ngram_dataset.json"
 with open(dataset_file, 'r') as f:
     ngram_dataset = json.load(f)
 
-# k = k-gram value, d = number of features
-k = 6
-d = 300
-regularization_params = [0, 0.02, 0.03, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1]
 '''
 Generate and evaluate the performance of features to predict whether a protein will bind to a specific allele. 
 '''
 def predict_proteins(k, d):
     total_train_MSE = 0.0
     total_test_MSE = 0.0
-
-    for allele in ngram_dataset:
+    pbar = ProgressBar()
+    for allele in pbar(ngram_dataset):
         # These are protein/binding affinity pairs
         proteins = ngram_dataset[allele]
-        print("Allele: ", allele)
-        print("Num Proteins: ", len(proteins))
 
         # Divide them into train/test sets
         num_samples = len(proteins)
@@ -42,7 +37,6 @@ def predict_proteins(k, d):
         testing_set = proteins[int(num_samples*0.8):]
 
         # Generate features using ngram structure
-        print("Generating Features")
         training_peptides = [p for (p,b) in training_set]
         train_y = [np.log10(float(b)) for (p, b) in training_set]
         testing_peptides = [p for (p,b) in testing_set]
@@ -73,11 +67,8 @@ def predict_proteins(k, d):
         train_features = np.zeros((len(training_peptides), d))
         test_features = np.zeros((len(testing_set), d))
 
-        print("Computing train set")
         for i in range(len(training_peptides)):
             sequence = training_peptides[i]
-            if i % 100 == 0:
-                print("I: ", i)
             for j in range(len(features)):
                 feature, quartile = features[j]
                 # If it's in the correct quartile, it's 1
@@ -97,7 +88,6 @@ def predict_proteins(k, d):
                     else:
                         train_features[i, j] = 0
 
-        print("Computing test set")
         for i in range(len(testing_peptides)):
             sequence = testing_peptides[i]
             for j in range(len(features)):
@@ -120,7 +110,6 @@ def predict_proteins(k, d):
                         test_features[i, j] = 0
 
         # Use a linear model here to calculate the best parameters for the linear regression model
-        print("Fitting models")
         model = linear_model.Ridge()
         model.fit(train_features, train_y)
 
@@ -136,7 +125,6 @@ def predict_proteins(k, d):
         total_train_MSE += train_mse
         total_test_MSE += test_mse
 
-        print("Allele: " + str(allele) + " Train MSE: " + str(train_mse) + " Test MSE: " + str(test_mse))
 
     print("D: " + str(d) + " K: " + str(k))
 
@@ -176,20 +164,8 @@ def run_experiments():
         json.dump(experiments, f)
 
 
-#predict_proteins(2, 100)
-#run_experiments()
-predict_proteins(k=4, d=1000)
+run_experiments()
 
-#gt, predict = predict_proteins(k=4, d=1000)
-#r = stats.pearsonr(gt, list(predict))
-#print("R squared: ", pow(r[0], 2))
-#with open("../../experiments/HLA-A*02:01-predict.json", 'w') as f:
-#    json.dump(list(predict), f)
-#with open("../../experiments/HLA-A*02:01-true.json", 'w') as f:
-#    json.dump(list(gt), f)
-
-
-#run_experiments()
 
 
 
