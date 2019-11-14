@@ -43,4 +43,4 @@ print("Num alleles not found: ", not_in_file)
 
 # Generate the new dataset with most of these amino acid sequences
 with open("mhcflurry_dataset.json", 'w') as f:
-    json.dump(comprehensive_dataset, f)
+	json.dump(comprehensive_dataset, f)

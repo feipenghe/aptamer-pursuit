@@ -27,7 +27,7 @@ def predict_proteins(k, d):
 
         # Divide them into train/test sets
         num_samples = len(proteins)
-        if num_samples < 20:
+        if num_samples < 150:
             continue
 
         # Randomly select training and test
@@ -73,20 +73,21 @@ def predict_proteins(k, d):
                 feature, quartile = features[j]
                 # If it's in the correct quartile, it's 1
                 starts = [m.start() for m in re.finditer(feature, sequence)]
-                for s in starts:
-                    # Each s is an index of the beginning of this features
-                    # If one of them appears in the correct quartile, then this is 1
-                    pctg = (s+1)/len(sequence)
-                    if pctg <= 0.25 and quartile == 1:
-                        train_features[i, j] = 1
-                    elif (pctg > 0.25 and pctg <= 0.5) and quartile == 2:
-                        train_features[i, j] = 1
-                    elif (pctg > 0.5 and pctg <= 0.75) and quartile == 3:
-                        train_features[i, j] = 1
-                    elif pctg > 0.75 and quartile == 4:
-                        train_features[i, j] = 1
-                    else:
-                        train_features[i, j] = 0
+                if len(starts) == 0:
+                    train_features[i, j] = 0
+                else:
+                    for s in starts:
+                        # Each s is an index of the beginning of this features
+                        # If one of them appears in the correct quartile, then this is 1
+                        pctg = (s+1)/len(sequence)
+                        if pctg <= 0.25 and quartile == 1:
+                            train_features[i, j] = 1
+                        elif (pctg > 0.25 and pctg <= 0.5) and quartile == 2:
+                            train_features[i, j] = 1
+                        elif (pctg > 0.5 and pctg <= 0.75) and quartile == 3:
+                            train_features[i, j] = 1
+                        elif pctg > 0.75 and quartile == 4:
+                            train_features[i, j] = 1
 
         for i in range(len(testing_peptides)):
             sequence = testing_peptides[i]
@@ -153,7 +154,7 @@ def run_experiments():
     # k --> (d, total_train_mse, total_test_mse)
     experiments = {}
     for k in range(2, 7):
-        for d in range(100, 1100, 100):
+        for d in range(100, 500, 100):
             d, k, total_train_mse, total_test_mse = predict_proteins(k, d)
             if k not in experiments:
                 experiments[k] = []
