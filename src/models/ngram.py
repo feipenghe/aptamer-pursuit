@@ -136,14 +136,13 @@ def predict_proteins(k, d):
 
         total_train_acc.append(train_acc)
         total_test_acc.append(test_acc)
-        break
-
 
     print("D: " + str(d) + " K: " + str(k))
-    print("Train Acc: ", total_train_acc)
-    print("Test Acc: ", total_test_acc)
 
-    return (d, k, total_train_acc, total_test_acc)
+    print("Average Train Accuracy: ", np.mean(total_train_acc))
+    print("Average Test Accuracy: ", np.mean(total_test_acc))
+
+    return (d, k, np.mean(total_train_acc), np.mean(total_test_acc))
 
 '''
 Generate statistics about the proteins that I predicted.
@@ -175,12 +174,12 @@ def run_experiments():
             experiments[k].append((d, total_train_mse, total_test_mse))
 
 
-    with open("../../experiments/ngram.json", 'w') as f:
+    with open("../../experiments/ngram_svm.json", 'w') as f:
         json.dump(experiments, f)
 
 
-#run_experiments()
-predict_proteins(k=2, d=100)
+run_experiments()
+#predict_proteins(k=2, d=100)
 
 
 
