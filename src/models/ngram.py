@@ -3,6 +3,7 @@ import json
 import random
 import numpy as np
 from sklearn import linear_model, metrics
+from sklearn.svm import SVC
 from scipy import stats
 import random
 import re
@@ -17,9 +18,17 @@ with open(dataset_file, 'r') as f:
 '''
 Generate and evaluate the performance of features to predict whether a protein will bind to a specific allele. 
 '''
+def classify_affinity(affinity):
+    affinity = float(affinity)
+    if affinity <= 1.0:
+        return 0
+    elif affinity > 1.0 and affinity <= 8000:
+        return 1
+    return 2
+
 def predict_proteins(k, d):
-    total_train_MSE = 0.0
-    total_test_MSE = 0.0
+    total_train_acc = []
+    total_test_acc = []
     pbar = ProgressBar()
     for allele in pbar(ngram_dataset):
         # These are protein/binding affinity pairs
@@ -38,9 +47,10 @@ def predict_proteins(k, d):
 
         # Generate features using ngram structure
         training_peptides = [p for (p,b) in training_set]
-        train_y = [np.log10(float(b)) for (p, b) in training_set]
+        train_y = [classify_affinity(b) for (p, b) in training_set]
         testing_peptides = [p for (p,b) in testing_set]
-        test_y = [np.log10(float(b)) for (p, b) in testing_set]
+
+        test_y = [classify_affinity(b) for (p, b) in testing_set]
         # Features --> Quartile
         features = []
         for i in range(d):
@@ -111,25 +121,29 @@ def predict_proteins(k, d):
                         test_features[i, j] = 0
 
         # Use a linear model here to calculate the best parameters for the linear regression model
-        model = linear_model.Ridge()
+        model = SVC(kernel='linear')
         model.fit(train_features, train_y)
 
         train_predict = model.predict(train_features)
         gt_train = train_y
-        train_mse = metrics.mean_squared_error(train_predict, gt_train)
+
+        train_acc = metrics.accuracy_score(gt_train, train_predict)
 
         test_predict = model.predict(test_features)
         gt_test = test_y
 
-        test_mse = metrics.mean_squared_error(test_predict, gt_test)
+        test_acc = metrics.accuracy_score(gt_test, test_predict)
 
-        total_train_MSE += train_mse
-        total_test_MSE += test_mse
+        total_train_acc.append(train_acc)
+        total_test_acc.append(test_acc)
+        break
 
 
     print("D: " + str(d) + " K: " + str(k))
+    print("Train Acc: ", total_train_acc)
+    print("Test Acc: ", total_test_acc)
 
-    return (d, k, total_train_MSE, total_test_MSE)
+    return (d, k, total_train_acc, total_test_acc)
 
 '''
 Generate statistics about the proteins that I predicted.
@@ -165,7 +179,8 @@ def run_experiments():
         json.dump(experiments, f)
 
 
-run_experiments()
+#run_experiments()
+predict_proteins(k=2, d=100)
 
 
 
