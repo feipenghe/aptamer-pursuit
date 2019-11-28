@@ -166,7 +166,7 @@ def generate_stats(predicted_proteins, seq_length):
 def run_experiments():
     # k --> (d, total_train_mse, total_test_mse)
     experiments = {}
-    for k in range(2, 7):
+    for k in range(2, 5):
         for d in range(100, 500, 100):
             d, k, total_train_mse, total_test_mse = predict_proteins(k, d)
             if k not in experiments:
