@@ -179,12 +179,6 @@ class ConvNet(nn.Module):
         x = self.fc1(x)
         x = torch.sigmoid(x)
         return x
-    
-    # Change loss to be custom loss
-    def loss(self, prediction, label):
-        l = nn.MSELoss()
-        label = torch.FloatTensor(label)
-        return l(torch.FloatTensor(prediction), label)
 
 
 # In[10]:
@@ -253,8 +247,6 @@ n = len(full_dataset)
 S_prime, S_prime_new = get_S_prime(n)
 print("Size of S: ", n)
 print("Size of naively sampled dataset: ", len(S_prime_new))
-diff = set(full_dataset) - set(S_prime_new)
-print("Size of set difference: ", len(diff))
 
 
 # ## Motivates importance sampling in SGD
@@ -330,7 +322,7 @@ def sgd(t=500, #num of iter
 
 # ### Calculating recall
 
-# In[ ]:
+# In[16]:
 
 
 # Recall test
@@ -358,7 +350,7 @@ def evaluate():
 
 # ## Hyperparameter tuning
 
-# In[ ]:
+# In[17]:
 
 
 gamma_values = [1e-5, 1e-4, 1e-3, 1e-2, 1e-1]
@@ -376,6 +368,18 @@ for g in gamma_values:
 
 
 # ## Evaluate
+
+# In[18]:
+
+
+# Recall
+
+
+# In[19]:
+
+
+# AUC --> Ordering graphic
+
 
 # In[ ]:
 
