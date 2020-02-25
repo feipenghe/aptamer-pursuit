@@ -322,13 +322,13 @@ def sgd(t=500, #num of iter
             param.data += gamma * g
 
 
-# In[ ]:
+# In[15]:
 
 
-sgd(t=1000)
+#sgd(t=1000)
 
 
-# ## Evaluation
+# ### Calculating recall
 
 # In[ ]:
 
@@ -353,7 +353,7 @@ def evaluate():
             else:
                 incorrect += 1
         
-        return (100* correct/(correct + incorrect))
+    return (100* correct/(correct + incorrect))
 
 
 # ## Hyperparameter tuning
@@ -374,6 +374,8 @@ for g in gamma_values:
         recall = evaluate()
         print("Recall with gamma: "+ str(g) + " , lambda: " + str(l) + " recall: ", recall)
 
+
+# ## Evaluate
 
 # In[ ]:
 
