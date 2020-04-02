@@ -328,6 +328,17 @@ def plot_cdf(train_cdf, test_cdf, i, j, lamb, gamma):
     plt.legend()
     plt.show()
 
+def histogram(eval_scores, train_scores, test_scores):
+    f, axes = plt.subplots(2, 2, figsize=(7, 7), sharex=True)
+    plt.xlim(0, 1.1)
+    sns.distplot(eval_scores , color="skyblue", label='New: not in dataset', ax=axes[0, 0])
+    sns.distplot(train_scores , color="gold", label='Train: in dataset', ax=axes[1, 0])
+    sns.distplot(test_scores, color='red', label='Test: in the dataset', ax=axes[0, 1])
+    axes[0,0].set_title("New: not in dataset")
+    axes[1,0].set_title("Train: in dataset")
+    axes[0, 1].set_title("Test: in dataset")
+    plt.show()
+
 
 # In[9]:
 
@@ -340,7 +351,7 @@ prime_test_loss_samples = prime_loss_samples(k, 'test')
 
 # ## SGD
 
-# In[15]:
+# In[10]:
 
 
 def sgd(lamb=1e28, #hyperparam
@@ -386,8 +397,8 @@ def sgd(lamb=1e28, #hyperparam
             else:
                 factor = 2
             out_prime = out_prime*factor #adjust for IS
-            print("Obj first part: ", out_prime.cpu().detach().numpy().flatten()[0]*lamb*indicator)
-            print("Obj second part: ", log_out.cpu().detach().numpy().flatten()[0])
+            #print("Obj first part: ", out_prime.cpu().detach().numpy().flatten()[0]*lamb*indicator)
+            #print("Obj second part: ", log_out.cpu().detach().numpy().flatten()[0])
             # Retain graph retains the graph for further operations
             (lamb*indicator*out_prime - log_out).backward(retain_graph=True) 
             optim.step()
@@ -407,13 +418,13 @@ def sgd(lamb=1e28, #hyperparam
                 new_score = model(x_new, y_new).cpu().detach().numpy().flatten()[0] #get unknown score
                 new_outputs.append(new_score)
 
-            if i % 100 == 0:
+            if i % 1000 == 0:
                 train_loss = lamb*get_out_prime("train") - get_log_out('train') #training loss
-                print("Train loss first part: ", lamb*get_out_prime("train"))
-                print("Train loss second part: ", get_log_out('train'))
+                #print("Train loss first part: ", lamb*get_out_prime("train"))
+                #print("Train loss second part: ", get_log_out('train'))
                 test_loss = (m/(n-m))*lamb*get_out_prime("test") - get_log_out('test') #test loss
-                print("Test loss first part: ", lamb*get_out_prime("test"))
-                print("Test loss second part: ", get_log_out('test'))
+                #print("Test loss first part: ", lamb*get_out_prime("test"))
+                #print("Test loss second part: ", get_log_out('test'))
                 train_losses.append(train_loss)
                 test_losses.append(test_loss)
 
@@ -431,10 +442,11 @@ def sgd(lamb=1e28, #hyperparam
                 test_cdf = np.cumsum(test_score)/np.sum(test_score) #test cdf
 
 
-            if i % 500 == 0:
+            if i % 5000 == 0:
                 plot_recall(train_recalls, test_recalls, i, j, lamb, gamma)
                 plot_loss(train_losses, test_losses, i, j, lamb, gamma)
                 plot_cdf(train_cdf, test_cdf, i, j, lamb, gamma)
+                histogram(new_outputs[-50:], train_score[-50:], test_score[-50:])
                 print("New score: ", np.average(new_outputs[-50:]))
                 print("Train score: ", np.average(train_score[-50:]))
                 print("Test score: ", np.average(test_score[-50:]))
@@ -446,9 +458,10 @@ def sgd(lamb=1e28, #hyperparam
 
 # ## Hyperparameter tuning
 
-# In[16]:
+# In[11]:
 
 
+# Hyperparameter search
 gammas = [1e-3, 1e-2]
 lambdas = [10, 5, 2]
 
