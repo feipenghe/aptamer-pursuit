@@ -310,9 +310,10 @@ def plot_loss(train_loss, test_loss, i, j, lamb, gamma):
     plt.legend()
     plt.show()
 
-def plot_recall(train_recall, test_recall, i, j, lamb, gamma):
+def plot_recall(train_recall, test_recall, new_recall, i, j, lamb, gamma):
     plt.plot(train_recall, 'b', label='Train recall')
     plt.plot(test_recall, 'y', label='Test recall')
+    plt.plot(new_recall, 'r', label='New recall')
     plt.ylabel("Recall (%)")
     plt.xlabel("Number of iterations")
     plt.title('Recall after ' + str(i) + " iterations, " + str(j) + " epochs, " + 'lambda =%.5f' % lamb  + ' gamma =%.5f' % gamma)
@@ -370,9 +371,11 @@ def sgd(lamb=1e28, #hyperparam
         test_recall_outputs = []
 
         new_outputs = []
+        new_recalls = []
 
         train_correct = 0
         test_correct = 0
+        new_correct = 0
         
         for i, (aptamer, peptide, (apt_prime, pep_prime), indicator) in enumerate(tqdm.tqdm(train_ds)):
             if i == 0:
@@ -417,8 +420,10 @@ def sgd(lamb=1e28, #hyperparam
                 x_new, y_new = convert(x, y) #generate unseen x'' and y'' from S_new
                 new_score = model(x_new, y_new).cpu().detach().numpy().flatten()[0] #get unknown score
                 new_outputs.append(new_score)
+                if new_score < 0.3:
+                    new_correct += 1
 
-            if i % 1000 == 0:
+            if i % 10000 == 0:
                 train_loss = lamb*get_out_prime("train") - get_log_out('train') #training loss
                 #print("Train loss first part: ", lamb*get_out_prime("train"))
                 #print("Train loss second part: ", get_log_out('train'))
@@ -432,6 +437,8 @@ def sgd(lamb=1e28, #hyperparam
                 train_recalls.append(train_recall) 
                 test_recall = 100*test_correct/i #test recall
                 test_recalls.append(test_recall)
+                new_recall = 100*new_correct/(i*10) #generated dataset recall
+                new_recalls.append(new_recall)
                 if i > 1000:
                     train_score = np.asarray(new_outputs[-10000:] + train_recall_outputs[-1000:]) 
                     test_score = np.asarray(new_outputs[-10000:] + test_recall_outputs[-1000:])
@@ -442,11 +449,11 @@ def sgd(lamb=1e28, #hyperparam
                 test_cdf = np.cumsum(test_score)/np.sum(test_score) #test cdf
 
 
-            if i % 5000 == 0:
-                plot_recall(train_recalls, test_recalls, i, j, lamb, gamma)
+            if i % 100000 == 0:
+                plot_recall(train_recalls, test_recalls, new_recalls, i, j, lamb, gamma)
                 plot_loss(train_losses, test_losses, i, j, lamb, gamma)
                 plot_cdf(train_cdf, test_cdf, i, j, lamb, gamma)
-                histogram(new_outputs[-50:], train_score[-50:], test_score[-50:])
+                histogram(new_outputs[-1000:], train_recall_outputs[-1000:], test_recall_outputs[-1000:])
                 print("New score: ", np.average(new_outputs[-50:]))
                 print("Train score: ", np.average(train_score[-50:]))
                 print("Test score: ", np.average(test_score[-50:]))
