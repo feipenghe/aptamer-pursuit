@@ -1,5 +1,5 @@
 # aptamer-pursuit
-This repo encompasses a project that involves characterizing peptides that will bind with high affinity to a particular aptamer (MHC allele).
+This repo encompasses a project that involves characterizing peptides that will bind with high affinity to aptamers.
 The following is the structure of the repository:
 
 
