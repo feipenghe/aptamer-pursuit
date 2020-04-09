@@ -1,5 +1,0 @@
-Experiments to Run:
-- Skip-Gram
-
-Experiments I've Run:
-- 1-gram, 2-gram, 3-gram
