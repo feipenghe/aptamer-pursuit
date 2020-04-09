@@ -4,10 +4,11 @@ The following is the structure of the repository:
 
 
 ### experiments/
-This folder has detailed notes of experiments and the current progress. 
+This folder runs experiments related to the data. These experiments don't involve modeling.  
 
 ### src/models/
-This contains the model scripts that I've tried so far.
+This contains model scripts as well as stored checkpoints. If you want to experiment with something related to models, use these files. 
 
 ### src/data/
-Datasets, json files, and data processing scripts that can be used in models.
+Datasets, json files, and data processing scripts that can be imported into model files. 
+
