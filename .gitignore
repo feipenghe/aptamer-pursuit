@@ -5,3 +5,5 @@ experiments/.ipynb_checkpoints/
 meetings/.ipynb_checkpoints/
 src/data/.ipynb_checkpoints/
 src/models/.ipynb_checkpoints/
+src/models/model_checkpoints/*.pth
+
