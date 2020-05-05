@@ -6,4 +6,5 @@ meetings/.ipynb_checkpoints/
 src/data/.ipynb_checkpoints/
 src/models/.ipynb_checkpoints/
 src/models/model_checkpoints/*.pth
-
+src/models/model_checkpoints/binary/*.pth
+src/models/model_checkpoints/mle/*.pth
