@@ -8,3 +8,4 @@ src/models/.ipynb_checkpoints/
 src/models/model_checkpoints/*.pth
 src/models/model_checkpoints/binary/*.pth
 src/models/model_checkpoints/mle/*.pth
+src/models/evaluation/*.fasta
