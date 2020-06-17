@@ -32,6 +32,6 @@ meetings/*.py
 src/models/evaluation/*.py
 src/models/evaluation/.ipynb_checkpoints/*
 src/models/evaluation/*.txt
-src/models/evaluation/nupyck/*
+src/models/evaluation/n*/*
 src/models/evaluation/captum.pyc
 src/models/evaluation/__pycache__/*
