@@ -22,7 +22,8 @@ src/models/model_checkpoints/mle/*.pth
 meetings/*.py
 meetings/*.png
 src/models/plots/binary/ConvNetComplex/*.png
-src/models/plots/binary/LinearConv1d/*.png
+src/models/plots/binary/*/*
+src/models/plots/mle/*/*
 src/models/evaluation/*.fasta
 meetings/*.txt
 src/models/mfold/*
