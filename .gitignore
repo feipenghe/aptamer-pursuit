@@ -35,3 +35,4 @@ src/models/evaluation/*.txt
 src/models/evaluation/n*/*
 src/models/evaluation/captum.pyc
 src/models/evaluation/__pycache__/*
+src/models/*.txt
