@@ -17,7 +17,7 @@ class PyTorchRegressor():
     methods implemented here are useful for calculating gradients and losses
     given certain masks.
     """
-    def __init__(self, model):
+    def __init__(self, model, verbose=False):
         """
         Parameters
         ----------
