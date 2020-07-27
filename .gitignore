@@ -36,3 +36,14 @@ src/models/evaluation/n*/*
 src/models/evaluation/captum.pyc
 src/models/evaluation/__pycache__/*
 src/models/*.txt
+src/models/generation/.ipynb_checkpoints/
+src/models/generation/__pycache__/
+src/models/generation/model_human.h5
+src/models/generation/model_human.json
+src/models/generation/*.py
+src/models/generation/CTCF-seqs.npz
+src/data/*.txt
+src/data/*.csv
+src/models/generation.*.txt
+src/data/*.json
+src/data/*.py
