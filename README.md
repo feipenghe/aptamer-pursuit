@@ -3,6 +3,10 @@ This repo encompasses a project that involves characterizing peptides that will 
 The following is the structure of the repository:
 
 
+### TODO
+* an architecture that takes single model and configuration
+
+
 ### archive/
 This contains all archived files.  
 
