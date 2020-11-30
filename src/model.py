@@ -40,9 +40,9 @@ class ConvTwoHead(nn.Module):
         self.fc2 = nn.Linear(1300, 1)
     
     def forward(self, apt, pep):
-        apt = apt.view(512, 4, 10).long()
-        self.cnn_apt_1(apt.double())
-        apt = self.cnn_apt(apt.long())
+        apt = apt.view(len(apt), 4, -1).long()
+        pep = pep.view(len(pep), 20, -1).long()
+        apt = self.cnn_apt(apt)
         pep = self.cnn_pep(pep)
         
         apt = apt.view(-1, 1).T
@@ -273,7 +273,7 @@ def train(model, device, train_loader, optimizer, epoch, log_interval):
         optimizer.step()
         if batch_idx % log_interval == 0:
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                epoch, batch_idx * len(data), len(train_loader.dataset),
+                epoch, batch_idx * len(apt), len(train_loader.dataset),
                 100. * batch_idx / len(train_loader), loss.item()))
     return np.mean(losses)
 
@@ -291,7 +291,7 @@ def test(model, device, test_loader, log_interval=None):
             correct += num_correct(output, label)
             if log_interval is not None and batch_idx % log_interval == 0:
                 print('Test: [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                    batch_idx * len(data), len(test_loader.dataset),
+                    batch_idx * len(apt), len(test_loader.dataset),
                     100. * batch_idx / len(test_loader), test_loss_on))
 
     test_loss /= len(test_loader.dataset)
