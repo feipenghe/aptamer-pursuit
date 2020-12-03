@@ -214,89 +214,269 @@ class ConvBaseline(nn.Module):
         x = self.relu(self.maxpool(x))
         x = torch.sigmoid(x)
         return x
+def loss(prediction, label, reduction = 'mean'):
+    loss_val = F.binary_cross_entropy(prediction.squeeze(), label.squeeze(), reduction = reduction)
+    return loss_val
+def vectorize_token(apt, pep):
+    """
+    One hot encoding
+    """
+    apt_vocab_size = 4
+    pep_vocab_size = 20
+
+    apt = nn.functional.one_hot(apt, num_classes=apt_vocab_size).float()
+    pep = nn.functional.one_hot(pep, num_classes=pep_vocab_size).float()
+    return apt, pep
+
+
 
 class LinearTwoHead(nn.Module):
     def __init__(self):
         super(LinearTwoHead, self).__init__()
-        self.name = "LinearTwoHead"
+        self.model_name = "LinearTwoHead"
         self.single_alphabet=False
-        
-        self.fc_apt_1 = nn.Linear(160, 200) 
-        self.fc_apt_2 = nn.Linear(200, 150)
-        self.fc_apt_3 = nn.Linear(150, 100)
-        
-        self.fc_pep_1 = nn.Linear(160, 250)
-        self.fc_pep_2 = nn.Linear(250, 100)
+        self.apt_vocab_size = 4
+        self.pep_vocab_size = 20
+        self.apt_embedding_dim = self.apt_vocab_size
+        self.pep_embedding_dom = self.pep_vocab_size
+        self.apt_length = 40
+        self.pep_length = 8
+
+        self.embedding_type = "one_hot"
+        # self.embedding_type = "embedding"
+        if self.embedding_type != "one_hot":
+            self.apt_embedding  = nn.Embedding(num_embeddings=self.apt_vocab_size, embedding_dim=self.apt_embedding_dim)
+            self.pep_embedding  =  nn.Embedding(num_embeddings=self.pep_vocab_size, embedding_dim=self.pep_embedding_dom)
+
+
+        apt_dim = self.apt_embedding_dim * self.apt_length  # 4 x 40 = 160
+        self.fc_apt_1 = nn.Linear(apt_dim, apt_dim*4) # batch size x length(40) x embedding
+        self.fc_apt_2 = nn.Linear(apt_dim*4, apt_dim*2)
+        self.fc_apt_3 = nn.Linear(apt_dim*2, 100)
+
+        pep_dim = self.pep_embedding_dom * self.pep_length
+        self.fc_pep_1 = nn.Linear(pep_dim, pep_dim*2)
+        self.fc_pep_2 = nn.Linear(pep_dim*2, 100)
         
         self.relu = nn.ReLU()
         self.maxpool = nn.MaxPool1d(2) 
 
         
         
-        self.fc_apt = nn.Sequential(self.fc_apt_1, self.relu, self.fc_apt_2, self.relu,  self.fc_apt_3)
-        self.fc_pep = nn.Sequential(self.fc_pep_1, self.relu,  self.fc_pep_2)
+        self.fc_apt = nn.Sequential(self.fc_apt_1, nn.ReLU(), self.fc_apt_2, nn.ReLU(),  self.fc_apt_3)
+        self.fc_pep = nn.Sequential(self.fc_pep_1, nn.ReLU(),  self.fc_pep_2)
         
         self.fc1 = nn.Linear(200, 100)
         self.fc2 = nn.Linear(100, 1)
-        
+        self.name = self.model_name + "_" + self.embedding_type  # name for saving
+
+
+
     def forward(self, apt, pep):
-        apt = apt.view(-1, 1).T
-        pep = pep.view(-1, 1).T
-        
+        # apt = apt.view(-1, 1).T
+        # pep = pep.view(-1, 1).T
+
+        if self.embedding_type == "one_hot":
+            apt, pep = vectorize_token(apt, pep)
+            # apt = nn.functional.one_hot( apt , num_classes = self.apt_vocab_size).float()
+            # pep = nn.functional.one_hot(pep, num_classes = self.pep_vocab_size).float()
+        else:
+            apt = self.apt_embedding(apt)
+            pep = self.pep_embedding(pep)
+        # print(apt.shape)
+        apt = apt.view(apt.size(0), -1)
+        pep = pep.view(pep.size(0), -1)
+
+        # print(apt.shape)
+        # exit()
         apt = self.fc_apt(apt)
         pep = self.fc_pep(pep)
         x = torch.cat((apt, pep), 1)
+
         x = self.fc2(self.fc1(x))
         x = torch.sigmoid(x)
         return x       
 
-def loss(prediction, label, reduction = 'mean'):
-    loss_val = F.binary_cross_entropy(prediction.squeeze(), label.squeeze(), reduction = reduction)
-    return loss_val
+    def accuracy(self, predictions, labels):
+        return (torch.sum((predictions > 0.5) == labels).item()/len(labels))
+#
+#
+# class PositionalEncoding(nn.Module):
+#     def __init__(self, d_model, dropout=0.1, max_len=300):
+#         super(PositionalEncoding, self).__init__()
+#         self.dropout = nn.Dropout(p=dropout)
+#
+#         pe = torch.zeros(max_len, d_model)
+#         position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+#         div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
+#         pe[:, 0::2] = torch.sin(position * div_term)
+#         pe[:, 1::2] = torch.cos(position * div_term)
+#         pe = pe.unsqueeze(0).transpose(0, 1)
+#         self.register_buffer('pe', pe)
+#
+#     def forward(self, x):
+#         #         x = x + self.pe[:x.size(0), :]
+#         #         print("x in forward: ", x.shape)
+#         x = x.permute(1, 0, 2)
+#         # seq len x batch x embedding size
+#         #         print("x: ", x.shape)
+#         #         print(" self.pe[:, :x.size(0)]: ",  self.pe[:, :x.size(0)].shape)
+#         x = x + self.pe[:x.size(0), :]
+#         return self.dropout(x)
+#
+#
+# import math
+#
+#
+#
+# class AptPepTransformer(nn.Module):
+#     def __init__(self, vocab_size, feature_size):
+#         super(AptPepTransformer, self).__init__()
+#         self.vocab_size = vocab_size
+#         self.feature_size = feature_size
+#         self.encoder = nn.Embedding(self.vocab_size, self.feature_size)  # they should share the same encoder
+#         #         self.tgt_encoder = nn.Embedding(self.vocab_size, self.feature_size)
+#
+#         # TODO: another dimentions = self.embed_src(src) * math.sqrt(self.d_model)
+#         self.pos_encoder = PositionalEncoding(self.feature_size)  # simple argument setting
+#         encoder_layers = nn.TransformerEncoderLayer(self.feature_size, nhead=4)
+#         self.transformer_encoder = nn.TransformerEncoder(encoder_layers, num_layers=6)
+#         self.decoder = nn.Linear(self.feature_size, self.vocab_size)
+#
+#         # This shares the encoder and decoder weights as described in lecture.
+#         self.decoder.weight = self.encoder.weight
+#         self.decoder.bias.data.zero_()
+#
+#         self.best_accuracy = -1
+#
+#     def forward(self, src, src_mask, tgt=None):  # hidden_state=None, cell_state = None
+#         batch_size = src.shape[0]
+#         sequence_length = src.shape[1]
+#
+#         # TODO finish defining the forward pass.
+#         # You should return the output from the decoder as well as the hidden state given by the gru.
+#         src = self.encoder(src) * math.sqrt(self.feature_size)  # TOTHINK: why math.sqrt(self.feature_size) here
+#         src = self.pos_encoder(src)
+#         #         print("data in transformer: ", src.shape)
+#         #         print('mask in transformer: ', src_mask.shape)
+#         output = self.transformer_encoder(src, src_mask)
+#
+#         output = self.decoder(output)  # TODO: shouldn't it predict a single character
+#
+#         # 100, 256, 512
+#         # seq len, batch size, feature size
+#
+#         # nn shouldn't depend on seq len and batch size
+#         # 100, 256, 89
+#         # 100, 256, 1 (sampling)
+#         # 1, 256, 1 (take the last one)
+#
+#         # permute (1, 0, 2)
+#         # view(x.size(0), -1)
+#         # nn.Linear(seq_len x feature_dim, vocab)
+#
+#         # 256 x 100 x 89
+#         # view(256, -1)
+#         # it should be 1 x 89
+#
+#         return output
+#
+#     def generate_square_subsequent_mask(self, sz):
+#         mask = (torch.triu(torch.ones(sz, sz)) == 1).transpose(0, 1)
+#
+#         mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
+#         return mask
+#
+#     # This defines the function that gives a probability distribution and implements the temperature computation.
+#     def inference(self, x, x_mask, temperature=1):
+#         """
+#         x: 1-D tensor representing the input sequence
+#         """
+#         x = x.unsqueeze(0)  # add a batch dimension
+#         #         import ipdb
+#         #         ipdb.set_trace()
+#         x = self.forward(x, x_mask)
+#         # after forward, seq len x batch x embedding
+#         x = x[-1, :, :]  # take last character output   # TODO: it shouldn't predict a single character
+#         x = x / max(temperature, 1e-20)
+#         x = F.softmax(x, dim=1)
+#
+#         return x
+#
+#     # Predefined loss function
+#     def loss(self, prediction, label, reduction='mean'):
+#         loss_val = F.cross_entropy(prediction.view(-1, self.vocab_size), label.view(-1), reduction=reduction)
+#         return loss_val
 
-# return number of correct (not percentage)
-def num_correct(label, pred):
-    #assert label.ndim == 1 and label.size() == pred.size()
-    pred = pred.squeeze() > 0.5
-    return (label.squeeze() == pred).sum().item()
+    # # Saves the current model
+    # def save_model(self, file_path, num_to_keep=1):
+    #     pt_util.save(self, file_path, num_to_keep)
+    #
+    # # Saves the best model so far
+    # def save_best_model(self, accuracy, file_path, num_to_keep=1):
+    #     if accuracy > self.best_accuracy:
+    #         self.save_model(file_path, num_to_keep)
+    #         self.best_accuracy = accuracy
+    #
+    # def load_model(self, file_path):
+    #     pt_util.restore(self, file_path)
+    #
+    # def load_last_model(self, dir_path):
+    #     return pt_util.restore_latest(self, dir_path)
 
-def train(model, device, train_loader, optimizer, epoch, log_interval):
-    model.train()
-    losses = []
-    for batch_idx, (apt, pep, label) in enumerate(train_loader):
-        apt, pep, label = apt.to(device), pep.to(device), label.to(device)
-        optimizer.zero_grad()
-        output = model(apt, pep)
-        loss = loss(output, label)
-        losses.append(loss.item())
-        loss.backward()
-        optimizer.step()
-        if batch_idx % log_interval == 0:
-            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                epoch, batch_idx * len(apt), len(train_loader.dataset),
-                100. * batch_idx / len(train_loader), loss.item()))
-    return np.mean(losses)
+# class LSTM(nn.Module):
+#     ## pure LSTM
+#     def __init__(self):
+#         super(Transformer).__init__()
 
-def test(model, device, test_loader, log_interval=None):
-    model.eval()
-    test_loss = 0
-    correct = 0
 
-    with torch.no_grad():
-        for batch_idx, (apt, pep, label) in enumerate(test_loader):
-            apt, pep, label = apt.to(device), pep.to(device), label.to(device)
-            output = model(apt, pep)
-            test_loss_on = loss(output, label, reduction='sum').item()
-            test_loss += test_loss_on
-            correct += num_correct(output, label)
-            if log_interval is not None and batch_idx % log_interval == 0:
-                print('Test: [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                    batch_idx * len(apt), len(test_loader.dataset),
-                    100. * batch_idx / len(test_loader), test_loss_on))
 
-    test_loss /= len(test_loader.dataset)
-    test_accuracy = 100. * correct / len(test_loader.dataset)
 
-    print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
-        test_loss, correct, len(test_loader.dataset), test_accuracy))
-    return test_loss, test_accuracy
+
+
+# # return number of correct (not percentage)
+# def num_correct(label, pred):
+#     #assert label.ndim == 1 and label.size() == pred.size()
+#     pred = pred.squeeze() > 0.5
+#     return (label.squeeze() == pred).sum().item()
+#
+# def train(model, device, train_loader, optimizer, epoch, log_interval):
+#     model.train()
+#     losses = []
+#     for batch_idx, (apt, pep, label) in enumerate(train_loader):
+#         apt, pep, label = apt.to(device), pep.to(device), label.to(device)
+#         optimizer.zero_grad()
+#         output = model(apt, pep)
+#         loss = loss(output, label)
+#         losses.append(loss.item())
+#         loss.backward()
+#         optimizer.step()
+#         if batch_idx % log_interval == 0:
+#             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+#                 epoch, batch_idx * len(apt), len(train_loader.dataset),
+#                 100. * batch_idx / len(train_loader), loss.item()))
+#     return np.mean(losses)
+#
+# def test(model, device, test_loader, log_interval=None):
+#     model.eval()
+#     test_loss = 0
+#     correct = 0
+#
+#     with torch.no_grad():
+#         for batch_idx, (apt, pep, label) in enumerate(test_loader):
+#             apt, pep, label = apt.to(device), pep.to(device), label.to(device)
+#             output = model(apt, pep)
+#             test_loss_on = loss(output, label, reduction='sum').item()
+#             test_loss += test_loss_on
+#             correct += num_correct(output, label)
+#             if log_interval is not None and batch_idx % log_interval == 0:
+#                 print('Test: [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+#                     batch_idx * len(apt), len(test_loader.dataset),
+#                     100. * batch_idx / len(test_loader), test_loss_on))
+#
+#     test_loss /= len(test_loader.dataset)
+#     test_accuracy = 100. * correct / len(test_loader.dataset)
+#
+#     print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
+#         test_loss, correct, len(test_loader.dataset), test_accuracy))
+#     return test_loss, test_accuracy

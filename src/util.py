@@ -138,7 +138,7 @@ class BinaryDataset(Dataset):
         labels = []
 
 
-        print("loading corruption dataset")
+        print("loading tsv dataset")
         neg_count = 0
         pos_count = 0
         # sentences
@@ -174,8 +174,6 @@ class BinaryDataset(Dataset):
         self.aptamers =  [self.encode_aptamer(a) for a in aptamers ]
         self.peptides  = [self.encode_peptide(p) for p in peptides]
         self.dataset_type =  dataset_type
-
-
         self.labels =  torch.tensor(labels)
 
 
@@ -184,12 +182,13 @@ class BinaryDataset(Dataset):
         if self.dataset_type == 0:
             return self.aptamers[index], self.peptides[index], self.labels[index]
         elif self.dataset_type == 1:
-            return self.sentences[index] + self.peptides[index], self.labels[index]
+            return self.aptamers[index] + self.peptides[index], self.labels[index]
         else:
             print("get item error ")
             exit()
+
     def __len__(self):
-        return len(self.sentences)
+        return len(self.aptamers)
 
     def comp_weights(self):
         """
@@ -306,10 +305,12 @@ if __name__ == '__main__':
     out_filepath = path.join(  pos_data_dir,"data.json")
     # prepare_data(pos_data_dir, neg_data_dir, data_dir, train_ratio = 0.7, val_ratio = 0.1)
 
-    train_dataset = BinaryDataset(data_path="data/dataset/val.tsv")
+    train_dataset = BinaryDataset(data_path="data/dataset/train.tsv")
     samples_weight = train_dataset.comp_weights()
     print("sample weigtht: " , samples_weight)
     sampler = WeightedRandomSampler(samples_weight, len(samples_weight))  # how likely to draw sample from each class
     train_loader = DataLoader(train_dataset, batch_size=512, num_workers=32, sampler=sampler)
     for i, (a, p, target) in enumerate(train_loader):
+        print(a)
+        exit()
         print("batch index {}, 0/1: {}/{}".format(i,len(np.where(target.numpy() == 0)[0]),len(np.where(target.numpy() == 1)[0])))
