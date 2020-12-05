@@ -217,16 +217,26 @@ class ConvBaseline(nn.Module):
 def loss(prediction, label, reduction = 'mean'):
     loss_val = F.binary_cross_entropy(prediction.squeeze(), label.squeeze(), reduction = reduction)
     return loss_val
+'''
+enc_apt = OneHotEncoder()
+enc_pep = OneHotEncoder()
+na_list = ['A', 'C', 'G', 'T']  # nucleic acids
+aa_list = ['R', 'L', 'S', 'A', 'G', 'P', 'T', 'V', 'N', 'D', 'C', 'Q', 'E', 'H', 'I', 'K', 'M', 'F', 'W',
+                   'Y']
+enc_apt.fit(np.array(na_list).T)
+enc_pep.fit(np.array(aa_list).T)
+'''
 def vectorize_token(apt, pep):
     """
     One hot encoding
     """
     apt_vocab_size = 4
     pep_vocab_size = 20
-
-    apt = nn.functional.one_hot(apt, num_classes=apt_vocab_size).float()
-    pep = nn.functional.one_hot(pep, num_classes=pep_vocab_size).float()
-    return apt, pep
+    hot_apt = [np.eye(apt_vocab_size)[a] for a in apt]
+    hot_pep = [np.eye(pep_vocab_size)[p] for p in pep]
+    #apt = nn.functional.one_hot(apt, num_classes=apt_vocab_size).float()
+    #pep = nn.functional.one_hot(pep, num_classes=pep_vocab_size).float()
+    return torch.tensor(hot_apt).float(), torch.tensor(hot_pep).float()
 
 
 
@@ -238,7 +248,7 @@ class LinearTwoHead(nn.Module):
         self.apt_vocab_size = 4
         self.pep_vocab_size = 20
         self.apt_embedding_dim = self.apt_vocab_size
-        self.pep_embedding_dom = self.pep_vocab_size
+        self.pep_embedding_dim = self.pep_vocab_size
         self.apt_length = 40
         self.pep_length = 8
 
@@ -246,7 +256,7 @@ class LinearTwoHead(nn.Module):
         # self.embedding_type = "embedding"
         if self.embedding_type != "one_hot":
             self.apt_embedding  = nn.Embedding(num_embeddings=self.apt_vocab_size, embedding_dim=self.apt_embedding_dim)
-            self.pep_embedding  =  nn.Embedding(num_embeddings=self.pep_vocab_size, embedding_dim=self.pep_embedding_dom)
+            self.pep_embedding  =  nn.Embedding(num_embeddings=self.pep_vocab_size, embedding_dim=self.pep_embedding_dim)
 
 
         apt_dim = self.apt_embedding_dim * self.apt_length  # 4 x 40 = 160
@@ -254,7 +264,7 @@ class LinearTwoHead(nn.Module):
         self.fc_apt_2 = nn.Linear(apt_dim*4, apt_dim*2)
         self.fc_apt_3 = nn.Linear(apt_dim*2, 100)
 
-        pep_dim = self.pep_embedding_dom * self.pep_length
+        pep_dim = self.pep_embedding_dim * self.pep_length
         self.fc_pep_1 = nn.Linear(pep_dim, pep_dim*2)
         self.fc_pep_2 = nn.Linear(pep_dim*2, 100)
         
@@ -280,12 +290,12 @@ class LinearTwoHead(nn.Module):
             apt, pep = vectorize_token(apt, pep)
             # apt = nn.functional.one_hot( apt , num_classes = self.apt_vocab_size).float()
             # pep = nn.functional.one_hot(pep, num_classes = self.pep_vocab_size).float()
-        else:
-            apt = self.apt_embedding(apt)
-            pep = self.pep_embedding(pep)
+        #else:
+            #apt = self.apt_embedding(apt)
+            #pep = self.pep_embedding(pep)
         # print(apt.shape)
-        apt = apt.view(apt.size(0), -1)
-        pep = pep.view(pep.size(0), -1)
+        apt = apt.view(apt.size(0), -1).float()
+        pep = pep.view(pep.size(0), -1).float()
 
         # print(apt.shape)
         # exit()
