@@ -4,7 +4,7 @@ import json
 import random
 import torch
 from torch.utils.data import Dataset
-from torch.utils.data import DataLoader, WeightedRandomSampler
+from torch.utils.data import DataLoader, WeightedRandomSampler, RandomSampler
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim import SGD, Adam
@@ -17,11 +17,11 @@ from util import BinaryDataset
 from model import *
 from tqdm import tqdm
 
-
+# TODO: add training accuracy
 # TODO: check performance of nn
 # TODO: data classes and write into json files
 # TODO: scheduler with hyperparameter
-# TODO: enable cpu parallel training (check cpu training speed). It's better to train 6-8 tasks
+
 
 
 def comp_loss(prediction, label, reduction = 'mean'):
@@ -37,10 +37,15 @@ def to_device(mode, apt, pep, label):
     return apt, pep, label
 
 def comp_accuracy(mode, model, output, label):
+    return get_model(mode, model).accuracy(output, label) * len(label)
+
+
+def get_model(mode, model):
     if mode == "parallel":
-        return model.module.accuracy(output, label)* len(label)
+        return model.module
     else:
-        return model.accuracy(output, label) * len(label)
+        return model
+
 def train(model, comp_loss, device, train_loader, val_loader, optimizer, epoch= 200, log_interval = 100):
     if type(device) == list:
         print("enable data parallel on: ", device)
@@ -87,7 +92,7 @@ def train(model, comp_loss, device, train_loader, val_loader, optimizer, epoch= 
             with torch.no_grad():
                 output = model(apt, pep)
                 val_loss += comp_loss(output, label)
-                val_correct += comp_accuracy(mode, model, output, label)
+                val_correct += get_model(mode, model).accuracy(output, label) * len(label)
                 cur_num_labels += len(label)
                 tqdm_val_loader.set_description_str(f"Validation Epoch: {e}      [Loss]: {val_loss/(batch_idx+1):.4f}    [Acc]: {val_correct/cur_num_labels}")
         avg_val_acc = val_correct *1.0 / cur_num_labels
@@ -95,8 +100,8 @@ def train(model, comp_loss, device, train_loader, val_loader, optimizer, epoch= 
         if avg_val_acc > best_val_acc:
             best_val_acc = avg_val_acc
             torch.save({"best_epoch": e,
-                        "best_model": model,
-                        "best_val_acc": best_val_acc}, f"./best_model_{model.module.name}.pt")
+                        "best_model": get_model(mode, model).state_dict(),
+                        "best_val_acc": best_val_acc}, f"./best_model_{get_model(mode, model).name}.pt")
     return np.mean(losses)
 
 
@@ -131,7 +136,7 @@ def num_correct(label, pred):
     pred = pred.squeeze() > 0.5
     return (label.squeeze() == pred).sum().item()
 
-
+import argparse
 if __name__ == '__main__':
     # torch.manual_seed(12345)
     # k = 10000
@@ -176,23 +181,45 @@ if __name__ == '__main__':
     # for i, aa in enumerate(original_blosum62.keys()):
     #     clip_blosum62[aa] = np.dot(np.sqrt(lamb), V[i])
 
-    # train_dataset = BinaryDataset(data_path="data/dataset/tmp.tsv")
-    # val_dataset = BinaryDataset(data_path="data/dataset/tmp.tsv")
-    train_dataset = BinaryDataset(data_path="data/dataset/train.tsv")
-    val_dataset = BinaryDataset(data_path="data/dataset/val.tsv")
+    argparser = argparse.ArgumentParser()
+    argparser.add_argument("--batch_size", default= 128, type=int)
+    argparser.add_argument("--embedding_type", default="one_hot", type=str)
+    argparser.add_argument("--test", default=False, type=bool, help = "used for debug")
+
+    args = argparser.parse_args()
+
+    if args.test:
+        train_dataset = BinaryDataset(data_path="data/dataset/tmp.tsv")
+        val_dataset = BinaryDataset(data_path="data/dataset/tmp.tsv")
+    else:
+        train_dataset = BinaryDataset(data_path="data/dataset/train.tsv")
+        val_dataset = BinaryDataset(data_path="data/dataset/val.tsv")
     samples_weight = train_dataset.comp_weights()
     train_sampler = WeightedRandomSampler(samples_weight, len(samples_weight))  # how likely to draw sample from each class
 
-    samples_weight = val_dataset.comp_weights()
-    val_sampler = WeightedRandomSampler(samples_weight, len(samples_weight))
 
-    train_loader = DataLoader(train_dataset, batch_size=128, num_workers=1, sampler=train_sampler, pin_memory=True)
-    val_loader = DataLoader(val_dataset, batch_size=128, num_workers=1, sampler=val_sampler, pin_memory=True)
-    device = [0, 1]
+    """  
+    python train.py --batch_size 128 --embedding_type embedding 
+    python train.py --batch_size 128 --embedding_type one_hot
+    python train.py --batch_size 128 --embedding_type one_hot --test True
+    """
+
+    val_sampler = RandomSampler(train_dataset, replacement= False) # ensure a uniform display of accuracy during validation
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=1, pin_memory=True, sampler=train_sampler)
+    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, num_workers=1, pin_memory=True)
+    # device = [0, 1]
+    device = 0
+    # device = "cpu"
     log_interval = 100
     epoch = 200
-    model  = LinearTwoHead()
-    optimizer = torch.optim.Adam(model.parameters(), lr = 0.01, weight_decay=0.99)
+    check_point = "./best_model_LinearTwoHead_one_hot.pt"
+    check_point = None
+    if check_point == None:
+        model  = LinearTwoHead(args.embedding_type)
+    else:
+        with open(check_point, "r") as fp:
+            model = torch.load(fp)["best_model"]
+    optimizer = torch.optim.Adam(model.parameters(), lr = 0.001, weight_decay=0.001)
     train(model, comp_loss, device, train_loader, val_loader, optimizer, epoch, log_interval)
 
 

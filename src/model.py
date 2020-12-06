@@ -232,16 +232,15 @@ def vectorize_token(apt, pep):
     """
     apt_vocab_size = 4
     pep_vocab_size = 20
-    hot_apt = [np.eye(apt_vocab_size)[a] for a in apt]
-    hot_pep = [np.eye(pep_vocab_size)[p] for p in pep]
-    #apt = nn.functional.one_hot(apt, num_classes=apt_vocab_size).float()
-    #pep = nn.functional.one_hot(pep, num_classes=pep_vocab_size).float()
-    return torch.tensor(hot_apt).float(), torch.tensor(hot_pep).float()
+    apt = nn.functional.one_hot(apt, num_classes=apt_vocab_size).float()
+    pep = nn.functional.one_hot(pep, num_classes=pep_vocab_size).float()
+    return apt, pep
+
 
 
 
 class LinearTwoHead(nn.Module):
-    def __init__(self):
+    def __init__(self, embedding_type):
         super(LinearTwoHead, self).__init__()
         self.model_name = "LinearTwoHead"
         self.single_alphabet=False
@@ -252,7 +251,7 @@ class LinearTwoHead(nn.Module):
         self.apt_length = 40
         self.pep_length = 8
 
-        self.embedding_type = "one_hot"
+        self.embedding_type = embedding_type
         # self.embedding_type = "embedding"
         if self.embedding_type != "one_hot":
             self.apt_embedding  = nn.Embedding(num_embeddings=self.apt_vocab_size, embedding_dim=self.apt_embedding_dim)
@@ -288,11 +287,9 @@ class LinearTwoHead(nn.Module):
 
         if self.embedding_type == "one_hot":
             apt, pep = vectorize_token(apt, pep)
-            # apt = nn.functional.one_hot( apt , num_classes = self.apt_vocab_size).float()
-            # pep = nn.functional.one_hot(pep, num_classes = self.pep_vocab_size).float()
-        #else:
-            #apt = self.apt_embedding(apt)
-            #pep = self.pep_embedding(pep)
+        else:
+            apt = self.apt_embedding(apt)
+            pep = self.pep_embedding(pep)
         # print(apt.shape)
         apt = apt.view(apt.size(0), -1).float()
         pep = pep.view(pep.size(0), -1).float()
