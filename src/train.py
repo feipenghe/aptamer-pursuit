@@ -183,9 +183,11 @@ if __name__ == '__main__':
 
     argparser = argparse.ArgumentParser()
     argparser.add_argument("--batch_size", default= 128, type=int)
+    argparser.add_argument("--weight_decay", default=0.00005, type=float, help = "weight penalty")
     argparser.add_argument("--embedding_type", default="one_hot", type=str)
     argparser.add_argument("--test", default=False, type=bool, help = "used for debug")
-
+    argparser.add_argument("--device", default="cpu", type=str)
+    argparser.add_argument("--optimizer", default="Adam", type=str)
     args = argparser.parse_args()
 
     if args.test:
@@ -199,27 +201,46 @@ if __name__ == '__main__':
 
 
     """  
-    python train.py --batch_size 128 --embedding_type embedding 
+    python train.py --batch_size 128 --embedding_type embedding --weight_decay 0.0005
     python train.py --batch_size 128 --embedding_type one_hot
     python train.py --batch_size 128 --embedding_type one_hot --test True
     """
 
-    val_sampler = RandomSampler(train_dataset, replacement= False) # ensure a uniform display of accuracy during validation
+
+    """
+    log for terminal
+    python train.py --batch_size 128 --embedding_type one_hot --device 0 --weight_decay 0.0005
+    python train.py --batch_size 128 --embedding_type embedding  --device 0 --weight_decay 0.0005
+    python train.py --batch_size 128 --embedding_type one_hot --device 1 --weight_decay 0.0001   # overfit
+    python train.py --batch_size 128 --embedding_type embedding  --device 1 --weight_decay 0.0001 --optimizer SGD
+    """
+
+    val_sampler = RandomSampler(val_dataset, replacement= False) # ensure a uniform display of accuracy during validation
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, num_workers=1, pin_memory=True, sampler=train_sampler)
-    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, num_workers=1, pin_memory=True)
+    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, num_workers=1, pin_memory=True, sampler=val_sampler)
     # device = [0, 1]
-    device = 0
+
+
+    # TODO: make it support device list
+    if args.device == "cpu":
+        device = args.device
+    else:
+        device = int(args.device)
     # device = "cpu"
     log_interval = 100
     epoch = 200
     check_point = "./best_model_LinearTwoHead_one_hot.pt"
     check_point = None
     if check_point == None:
-        model  = LinearTwoHead(args.embedding_type)
+        model = LinearTwoHead(args.embedding_type)
     else:
         with open(check_point, "r") as fp:
             model = torch.load(fp)["best_model"]
-    optimizer = torch.optim.Adam(model.parameters(), lr = 0.001, weight_decay=0.001)
+
+    if args.optimizer == "Adam":
+        optimizer = torch.optim.Adam(model.parameters(), lr = 0.001, weight_decay=args.weight_decay)
+    else:
+        optimizer = torch.optim.SGD(model.parameters(), lr=0.001, weight_decay=args.weight_decay)
     train(model, comp_loss, device, train_loader, val_loader, optimizer, epoch, log_interval)
 
 
