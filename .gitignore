@@ -37,4 +37,4 @@ src/generation.*.txt
 src/data/*.json
 src/data/*.py
 *.pt
-
+*.pyc

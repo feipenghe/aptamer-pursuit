@@ -259,10 +259,12 @@ class BinaryDataset(Dataset):
 
         """
         class_sample_count = np.array([len(np.where(self.labels == t)[0]) for t in np.unique(self.labels)])
+        print("np.unique(self.labels): ", np.unique(self.labels))
         print("class sample count: ", class_sample_count)
         weight = 1.0/class_sample_count
         samples_weight = np.array([weight[t] for t in self.labels] )
         print("sample weight: ", samples_weight)
+
         samples_weight = torch.from_numpy(samples_weight)
         return samples_weight.double()
 
