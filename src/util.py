@@ -13,7 +13,7 @@ import tqdm
 import matplotlib.pyplot as plt
 import seaborn as sns
 from numpy import linalg as LA
-
+from sklearn.preprocessing import OneHotEncoder
 
 class AptPepDataset(Dataset):
     def __init__(self, pos_data_file, neg_data_file, batch_size):
@@ -118,6 +118,41 @@ def prepare_data(pos_data_dir, neg_data_dir, data_dir, train_ratio = 0.7, val_ra
 
     write_dict(data_dir)
 
+def get_gen(num):
+    print("Generating samples...")
+    na_list = ['A', 'C', 'G', 'T']  # nucleic acids
+    aa_list = ['R', 'L', 'S', 'A', 'G', 'P', 'T', 'V', 'N', 'D', 'C', 'Q', 'E', 'H', 'I', 'K', 'M', 'F', 'W', 'Y']
+    sum_20 = 0.0625*5 + 0.09375*3 + 0.03125*12 #sum of freq without the stop codon
+    pvals = [0.09375/sum_20]*3 + [0.0625/sum_20]*5 + [0.03125/sum_20]*11 + \
+        [1- sum([0.09375/sum_20]*3 + [0.0625/sum_20]*5 + [0.03125/sum_20]*11)]
+
+    def get_x():
+        x_idx = np.random.randint(0, 4, 40)
+        x = ""
+        for i in x_idx:
+            x += na_list[i]
+        return x
+
+        # Sample y from P_y (assume peptides follow NNK)
+    def get_y(distribution):
+        if distribution == 'NNK':
+            y_idx = np.random.choice(20, 7, p=pvals)
+            lst = aa_list
+        elif distribution == 'uniform':
+            y_idx = np.random.choice(20, 7, p=uniform_pvals)
+            lst = aa_list
+        elif distribution == 'new_nnk':
+            y_idx = np.random.choice(20, 7, p=pvals_2)
+            st = aa_list_2
+        y = "M"
+        for i in y_idx:
+            y += lst[i]
+        return y
+    apt = [get_x() for i in range(num)]
+    pep = [get_y('NNK') for i in range(num)]
+    label = [[0]]*num
+    return [apt, pep, label]
+
     # na_list = ['A', 'C', 'G', 'T']  # nucleic acids
     # aa_list = ['R', 'L', 'S', 'A', 'G', 'P', 'T', 'V', 'N', 'D', 'C', 'Q', 'E', 'H', 'I', 'K', 'M', 'F', 'W',
     #            'Y']  # amino acids
@@ -155,17 +190,29 @@ class BinaryDataset(Dataset):
                     neg_count += 1
                 else:
                     pos_count += 1
+
+        # generate samples with NNK and 
+        # len(gen) = len(neg)
+        gen_apt, gen_pep, gen_label = get_gen(neg_count)
+        aptamers += gen_apt
+        peptides += gen_pep
+        labels += gen_label
+        gen_count = neg_count
+
         self.pos_count = pos_count
-        self.neg_count = neg_count
+        self.neg_count = neg_count + gen_count
 
 
         na_list = ['A', 'C', 'G', 'T']  # nucleic acids
         aa_list = ['R', 'L', 'S', 'A', 'G', 'P', 'T', 'V', 'N', 'D', 'C', 'Q', 'E', 'H', 'I', 'K', 'M', 'F', 'W',
                    'Y']  # amino acids
+        #enc_apt = OneHotEncoder()
+        #enc_pep = OneHotEncoder()
+        #self.aptamer_encode = enc_apt.fit(np.array(na_list).reshape((-1, 1)))
+        #self.peptide_encode = enc_pep.fit(np.array(aa_list).reshape((-1, 1)))
 
         # sample_weights
         # how to access sample weights
-
         self.aptamer_decode = dict(enumerate(na_list))
         self.peptide_decode = dict(enumerate(aa_list))
         self.aptamer_encode = dict({(v, k) for k,v in self.aptamer_decode.items()})
@@ -175,8 +222,19 @@ class BinaryDataset(Dataset):
         self.peptides  = [self.encode_peptide(p) for p in peptides]
         self.dataset_type =  dataset_type
         self.labels =  torch.tensor(labels)
+    '''
+        self.aptamer_decode = dict(enumerate(na_list))
+        self.peptide_decode = dict(enumerate(aa_list))
+        self.aptamer_encode = dict({(v, k) for k,v in self.aptamer_decode.items()})
+        self.peptide_encode = dict({(v, k) for k,v in self.peptide_decode.items()})
 
-
+        self.aptamers =  [self.aptamer_encode.transform(np.array([na for na in a]).reshape((-1, 1))) for a in aptamers]
+        self.peptides  = [self.peptide_encode.transform(np.array([aa for aa in p]).reshape((-1, 1))) for p in peptides]
+        #self.aptamers = nn.functional.one_hot(aptamers, num_classes=apt_vocab_size).float()
+        #self.peptides = nn.functional.one_hot(peptides, num_classes=pep_vocab_size).float()
+        self.dataset_type =  dataset_type
+        self.labels =  torch.tensor(labels)
+    '''
 
     def __getitem__(self, index):
         if self.dataset_type == 0:
