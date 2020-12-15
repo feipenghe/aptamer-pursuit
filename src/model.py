@@ -15,10 +15,21 @@ import seaborn as sns
 from numpy import linalg as LA
 
 class ConvTwoHead(nn.Module):
-    def __init__(self):
+    def __init__(self, embedding_type = 'one_hot'):
         super(ConvTwoHead, self).__init__()
         self.name = "ConvTwoHead"
         self.single_alphabet=False
+        self.apt_vocab_size = 4
+        self.pep_vocab_size = 20
+        self.apt_embedding_dim = self.apt_vocab_size
+        self.pep_embedding_dim = self.pep_vocab_size
+        self.apt_length = 40
+        self.pep_length = 8
+        self.embedding_type = embedding_type
+        # self.embedding_type = "embedding"
+        if self.embedding_type != "one_hot":
+            self.apt_embedding  = nn.Embedding(num_embeddings=self.apt_vocab_size, embedding_dim=self.apt_embedding_dim)
+            self.pep_embedding  =  nn.Embedding(num_embeddings=self.pep_vocab_size, embedding_dim=self.pep_embedding_dim)
         
         self.cnn_apt_1 = nn.Conv1d(4, 100, 3, padding=2) 
         self.cnn_apt_2 = nn.Conv1d(50, 150, 3, padding=2) 
@@ -40,13 +51,19 @@ class ConvTwoHead(nn.Module):
         self.fc2 = nn.Linear(1300, 1)
     
     def forward(self, apt, pep):
-        apt = apt.view(len(apt), 4, -1).long()
-        pep = pep.view(len(pep), 20, -1).long()
+        if self.embedding_type == "one_hot":
+            apt, pep = vectorize_token(apt, pep)
+        else:
+            apt = self.apt_embedding(apt)
+            pep = self.pep_embedding(pep)
+
+        apt = apt.view(len(apt), 4, -1).float()
+        pep = pep.view(len(pep), 20, -1).float()
         apt = self.cnn_apt(apt)
         pep = self.cnn_pep(pep)
         
-        apt = apt.view(-1, 1).T
-        pep = pep.view(-1, 1).T
+        apt = apt.view(len(apt), -1)
+        pep = pep.view(len(pep), -1)
         x = torch.cat((apt, pep), 1)
         x = self.fc1(x)
         x = self.fc2(x)
