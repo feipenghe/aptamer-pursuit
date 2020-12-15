@@ -59,12 +59,14 @@ def train(model, comp_loss, device, train_loader, val_loader, optimizer, epoch= 
 
     losses = []
     val_acc_l = []
-
+    epoch_train_loss_l = [] # record average train loss
+    epoch_val_loss_l = [] # record average validation loss
     best_val_acc = 0
     for e in range(epoch):
         model.train()
         tqdm_train_loader = tqdm(train_loader)
-
+        epoch_train_loss = 0.
+        count = 0
         for batch_idx, (apt, pep, label) in enumerate(tqdm_train_loader):
             apt, pep, label = to_device(mode, apt, pep, label)
             # if mode == "parallel":
@@ -76,32 +78,55 @@ def train(model, comp_loss, device, train_loader, val_loader, optimizer, epoch= 
             loss = comp_loss(output, label)
 
             loss.backward()
-            losses.append(loss.detach().item())  # record loss and detach the computation graph
+            loss = loss.detach().item()
+            epoch_train_loss += loss
+            losses.append(loss)  # record loss and detach the computation graph
             optimizer.step()
             if batch_idx % log_interval == 0:
                 tqdm_train_loader.set_description_str('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                     e, batch_idx * len(apt), len(train_loader.dataset),
-                    100. * batch_idx / len(train_loader), loss.item()))
+                    100. * batch_idx / len(train_loader), loss))
+            count += 1
+        epoch_train_loss_l.append(epoch_train_loss/count)
+
+
         model.eval()
         tqdm_val_loader = tqdm(val_loader)
         val_loss = 0.
         val_correct = 0
         cur_num_labels = 0
+
+        count = 0
+        epoch_val_loss = 0.
         for batch_idx, (apt, pep, label) in enumerate(tqdm_val_loader):
             apt, pep, label = to_device(mode, apt, pep, label)
             with torch.no_grad():
                 output = model(apt, pep)
-                val_loss += comp_loss(output, label)
+                loss = comp_loss(output, label).item()
+                val_loss += loss
+                epoch_val_loss += loss
                 val_correct += get_model(mode, model).accuracy(output, label) * len(label)
                 cur_num_labels += len(label)
                 tqdm_val_loader.set_description_str(f"Validation Epoch: {e}      [Loss]: {val_loss/(batch_idx+1):.4f}    [Acc]: {val_correct/cur_num_labels}")
+            count += 1
+            epoch_val_loss += val_loss
+        epoch_val_loss_l.append(epoch_val_loss/count)
         avg_val_acc = val_correct *1.0 / cur_num_labels
         val_acc_l.append(avg_val_acc)
         if avg_val_acc > best_val_acc:
             best_val_acc = avg_val_acc
             torch.save({"best_epoch": e,
                         "best_model": get_model(mode, model).state_dict(),
-                        "best_val_acc": best_val_acc}, f"./best_model_{get_model(mode, model).name}.pt")
+                        "best_val_acc": best_val_acc}, f"./best_model_{get_model(mode, model).name}.pt"
+                       )
+        # print("epoch_train_loss_l: ", epoch_train_loss_l)
+        # print("epoch_val_loss_l: ", epoch_val_loss_l)
+        # epoch_train_loss_l = []  # record average train loss
+        # epoch_val_loss_l = []  # record average validation loss
+    with open(f"./best_model_{get_model(mode, model).name}.json", "w") as fp:
+        json.dump({"epoch_train_loss_l": epoch_train_loss_l,
+        "epoch_val_loss_l": epoch_val_loss_l}, fp)
+
     return np.mean(losses)
 
 
