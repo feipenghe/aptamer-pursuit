@@ -257,8 +257,8 @@ if __name__ == '__main__':
     check_point = "./best_model_LinearTwoHead_one_hot.pt"
     check_point = None
     if check_point == None:
-        # model = LinearTwoHead(args.embedding_type)
-        model = ConvTwoHead(args.embedding_type)
+        model = LinearTwoHead(args.embedding_type)
+        # model = ConvTwoHead(args.embedding_type)
     else:
         with open(check_point, "r") as fp:
             model = torch.load(fp)["best_model"]

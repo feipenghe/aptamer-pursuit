@@ -69,7 +69,8 @@ class ConvTwoHead(nn.Module):
         x = self.fc2(x)
         x = torch.sigmoid(x)
         return x
-
+    def accuracy(self, predictions, labels):
+        return (torch.sum((predictions > 0.5) == labels).item()/len(labels))
 # Expects peptides to be encoding according to BLOSUM62 matrix
 # Expects aptamers to be one hot encoded
 class BlosumNet(nn.Module):
