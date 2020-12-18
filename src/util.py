@@ -291,6 +291,147 @@ class BinaryDataset(Dataset):
         #     tokens.append(self.peptide_decode[i])
         return [self.peptide_decode[i] for i in indices]
 
+class RocDataset(Dataset):
+    def __init__(self, data_path,  dataset_type = 0):
+
+        '''
+        :param sentence_data_path:
+        :param token_level:
+        :param unk_cutoff:
+        :param tokenizer_path:
+        :param tokenizer_training_path:  Both used for train the tokenizer and the model
+        '''
+        super().__init__()
+
+        aptamers = []
+        peptides = []
+        labels = []
+
+
+        print("loading tsv dataset")
+        neg_count = 0
+        pos_count = 0
+        # sentences
+        with open(data_path, "r") as f:
+            reader = csv.reader(f, delimiter="\t", quoting=csv.QUOTE_NONE)
+            next(reader)  # Ignore header
+            for row in reader:
+                # Each row contains a sentence and label (either 0 or 1)
+                aptamer, peptide, label = row
+                if int(label) == 0:
+                    if neg_count >= 500:
+                        continue
+                else:
+                    if pos_count >= 1000:
+                        continue
+
+                aptamers.append(aptamer)
+                peptides.append(peptide)
+                labels.append([int(label)])
+                if int(label) == 0:
+                    neg_count += 1
+                else:
+                    pos_count += 1
+
+        # generate samples with NNK and 
+        # len(gen) = len(neg)
+        gen_apt, gen_pep, gen_label = get_gen(neg_count)
+        aptamers += gen_apt
+        peptides += gen_pep
+        labels += gen_label
+        gen_count = neg_count
+
+        self.pos_count = pos_count
+        self.neg_count = neg_count 
+
+
+        na_list = ['A', 'C', 'G', 'T']  # nucleic acids
+        aa_list = ['R', 'L', 'S', 'A', 'G', 'P', 'T', 'V', 'N', 'D', 'C', 'Q', 'E', 'H', 'I', 'K', 'M', 'F', 'W',
+                   'Y']  # amino acids
+        #enc_apt = OneHotEncoder()
+        #enc_pep = OneHotEncoder()
+        #self.aptamer_encode = enc_apt.fit(np.array(na_list).reshape((-1, 1)))
+        #self.peptide_encode = enc_pep.fit(np.array(aa_list).reshape((-1, 1)))
+
+        # sample_weights
+        # how to access sample weights
+        self.aptamer_decode = dict(enumerate(na_list))
+        self.peptide_decode = dict(enumerate(aa_list))
+        self.aptamer_encode = dict({(v, k) for k,v in self.aptamer_decode.items()})
+        self.peptide_encode = dict({(v, k) for k,v in self.peptide_decode.items()})
+
+        self.aptamers =  [self.encode_aptamer(a) for a in aptamers ]
+        self.peptides  = [self.encode_peptide(p) for p in peptides]
+        self.dataset_type =  dataset_type
+        self.labels =  torch.tensor(labels)
+    '''
+        self.aptamer_decode = dict(enumerate(na_list))
+        self.peptide_decode = dict(enumerate(aa_list))
+        self.aptamer_encode = dict({(v, k) for k,v in self.aptamer_decode.items()})
+        self.peptide_encode = dict({(v, k) for k,v in self.peptide_decode.items()})
+
+        self.aptamers =  [self.aptamer_encode.transform(np.array([na for na in a]).reshape((-1, 1))) for a in aptamers]
+        self.peptides  = [self.peptide_encode.transform(np.array([aa for aa in p]).reshape((-1, 1))) for p in peptides]
+        #self.aptamers = nn.functional.one_hot(aptamers, num_classes=apt_vocab_size).float()
+        #self.peptides = nn.functional.one_hot(peptides, num_classes=pep_vocab_size).float()
+        self.dataset_type =  dataset_type
+        self.labels =  torch.tensor(labels)
+    '''
+
+    def __getitem__(self, index):
+        if self.dataset_type == 0:
+            return self.aptamers[index], self.peptides[index], self.labels[index]
+        elif self.dataset_type == 1:
+            return self.aptamers[index] + self.peptides[index], self.labels[index]
+        else:
+            print("get item error ")
+            exit()
+
+    def __len__(self):
+        return len(self.aptamers)
+
+    def comp_weights(self):
+        """
+        Compute weights based on the data class distribution.
+        Used for weighted sampling.
+
+        Example usage:
+        sampler = WeightedRandomSampler(samples_weight, len(samples_weight))
+        train_loader = DataLoader(train_dataset, batch_size=bs, num_workers=1, sampler=sampler)
+
+        """
+        class_sample_count = np.array([len(np.where(self.labels == t)[0]) for t in np.unique(self.labels)])
+        print("np.unique(self.labels): ", np.unique(self.labels))
+        print("class sample count: ", class_sample_count)
+        weight = 1.0/class_sample_count
+        samples_weight = np.array([weight[t] for t in self.labels] )
+        print("sample weight: ", samples_weight)
+
+        samples_weight = torch.from_numpy(samples_weight)
+        return samples_weight.double()
+
+    def encode_aptamer(self, aptamer):
+        indices = []
+        for a in aptamer:
+            indices.append(self.aptamer_encode[a])
+        return torch.tensor(indices)
+    def encode_peptide(self, peptide):
+        indices = []
+        for p in peptide:
+            indices.append(self.peptide_encode[p])
+        return torch.tensor(indices)
+
+    def decode_aptamer(self, indices):
+        tokens = []
+        for i in indices:
+            tokens.append(self.aptamer_decode[i])
+        return tokens
+
+    def decode_peptide(self, indices):
+        # tokens = []
+        # for i in indices:
+        #     tokens.append(self.peptide_decode[i])
+        return [self.peptide_decode[i] for i in indices]
 
 class AUCDataset(Dataset):
     def __init__(self, filepath, negfilepath=None):
