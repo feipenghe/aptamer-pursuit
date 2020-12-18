@@ -75,7 +75,7 @@ if __name__ == '__main__':
     models_name = ["LinearTwoHead_embedding","ConvTwoHead"]
     legend_name = ["LinearTwoHead","ConvTwoHead"]
     device = "cpu"
-    val_dataset = RocDataset(data_path="./val.tsv")
+    val_dataset = RocDataset(data_path="./test.tsv")
     print(len(val_dataset))
     val_sampler = RandomSampler(val_dataset, replacement= False) 
     val_loader = DataLoader(val_dataset, batch_size=1)

@@ -16,8 +16,11 @@ from numpy import linalg as LA
 from util import BinaryDataset
 from model import *
 from tqdm import tqdm
+from bio_embeddings.embed import SeqVecEmbedder, ProtTransBertBFDEmbedder
 
-# TODO: add training accuracy
+
+# TODO: write randomly generated data into files
+# TODO: test fewer embedding dimension (around 2*apt_vocab_size) with larger batch size
 # TODO: check performance of nn
 # TODO: data classes and write into json files
 # TODO: scheduler with hyperparameter
@@ -29,11 +32,13 @@ def comp_loss(prediction, label, reduction = 'mean'):
     loss_val = F.binary_cross_entropy(prediction.squeeze(), label.squeeze().float())
     return loss_val
 
-def to_device(mode, apt, pep, label):
+def to_device(mode, device, apt, pep, label):
     if mode == "parallel":
         apt, pep, label = apt.cuda(), pep.cuda(), label.cuda()
+        # apt, pep, label = apt.cuda(), pep, label.cuda()
     else:
         apt, pep, label = apt.to(device), pep.to(device), label.to(device)
+        # apt, pep, label = apt.to(device), pep, label.to(device)
     return apt, pep, label
 
 def comp_accuracy(mode, model, output, label):
@@ -62,13 +67,16 @@ def train(model, comp_loss, device, train_loader, val_loader, optimizer, epoch= 
     epoch_train_loss_l = [] # record average train loss
     epoch_val_loss_l = [] # record average validation loss
     best_val_acc = 0
+    pep_embedder = SeqVecEmbedder()
     for e in range(epoch):
         model.train()
         tqdm_train_loader = tqdm(train_loader)
         epoch_train_loss = 0.
         count = 0
         for batch_idx, (apt, pep, label) in enumerate(tqdm_train_loader):
-            apt, pep, label = to_device(mode, apt, pep, label)
+            pep_embedding_batch = torch.tensor(pep_embedder.embed(pep))
+            pep_embedding_batch = pep_embedding_batch.permute(1, 0, 2)
+            apt, pep, label = to_device(mode, device, apt, pep_embedding_batch, label)
             # if mode == "parallel":
             #     apt, pep, label = apt.cuda(), pep.cuda(), label.cuda()
             # else:
@@ -99,7 +107,10 @@ def train(model, comp_loss, device, train_loader, val_loader, optimizer, epoch= 
         count = 0
         epoch_val_loss = 0.
         for batch_idx, (apt, pep, label) in enumerate(tqdm_val_loader):
-            apt, pep, label = to_device(mode, apt, pep, label)
+            pep_embedding_batch = torch.tensor(pep_embedder.embed(pep))
+            pep_embedding_batch = pep_embedding_batch.permute(1, 0, 2)
+            apt, pep, label = to_device(mode, device, apt, pep_embedding_batch, label)
+
             with torch.no_grad():
                 output = model(apt, pep)
                 loss = comp_loss(output, label).item()
@@ -111,19 +122,20 @@ def train(model, comp_loss, device, train_loader, val_loader, optimizer, epoch= 
             count += 1
             epoch_val_loss += val_loss
         epoch_val_loss_l.append(epoch_val_loss/count)
-        avg_val_acc = val_correct *1.0 / cur_num_labels
+        avg_val_acc = val_correct * 1.0 / cur_num_labels
         val_acc_l.append(avg_val_acc)
         if avg_val_acc > best_val_acc:
             best_val_acc = avg_val_acc
             torch.save({"best_epoch": e,
                         "best_model": get_model(mode, model).state_dict(),
-                        "best_val_acc": best_val_acc}, f"./best_model_{get_model(mode, model).name}.pt"
+                        "best_val_acc": best_val_acc}, f"./best_model_{get_model(mode, model).name}_{expr_name}.pt"
                        )
         # print("epoch_train_loss_l: ", epoch_train_loss_l)
         # print("epoch_val_loss_l: ", epoch_val_loss_l)
         # epoch_train_loss_l = []  # record average train loss
         # epoch_val_loss_l = []  # record average validation loss
-    with open(f"./best_model_{get_model(mode, model).name}.json", "w") as fp:
+
+    with open(f"./best_model_{get_model(mode, model).name}_{expr_name}.json", "w") as fp:
         json.dump({"epoch_train_loss_l": epoch_train_loss_l,
         "epoch_val_loss_l": epoch_val_loss_l}, fp)
 
@@ -163,49 +175,6 @@ def num_correct(label, pred):
 
 import argparse
 if __name__ == '__main__':
-    # torch.manual_seed(12345)
-    # k = 10000
-    # device = torch.device("cuda:0" if torch.cuda.is_available() else 'cpu')
-    # na_list = ['A', 'C', 'G', 'T']  # nucleic acids
-    # aa_list = ['R', 'L', 'S', 'A', 'G', 'P', 'T', 'V', 'N', 'D', 'C', 'Q', 'E', 'H', 'I', 'K', 'M', 'F', 'W',
-    #            'Y']  # amino acids
-    #
-    # NNK_freq = [0.09375] * 3 + [0.0625] * 5 + [0.03125] * 12  # freq of 21 NNK codons including the stop codon
-    # sum_20 = 0.0625 * 5 + 0.09375 * 3 + 0.03125 * 12  # sum of freq without the stop codon
-    # pvals = [0.09375 / sum_20] * 3 + [0.0625 / sum_20] * 5 + [0.03125 / sum_20] * 12  # normalize freq for 20 codons
-    # pvals = [0.09375 / sum_20] * 3 + [0.0625 / sum_20] * 5 + [0.03125 / sum_20] * 11 + \
-    #         [1 - sum([0.09375 / sum_20] * 3 + [0.0625 / sum_20] * 5 + [0.03125 / sum_20] * 11)]
-    # # adjust sum to 1 due to numerical issue
-    # uniform_pvals = [0.05] * 20
-    #
-    # encoding_style = 'regular'
-    # lambda_val = 1
-    # alpha = 0.9
-    # beta = 0.1
-    #
-    # aa_list_2 = ["A", "C", "D", "E", "F", "G", "H", "I", "K", "L", "M", "N", "P", "Q", "R", "S", "T", "V", "W", "Y"]
-    # pvals_2 = [0.07668660126327106, 0.035596693992742914, 0.02474465797607849, 0.04041795457599785, 0.02319916677865878,
-    #            0.1149711060341352, 0.02187206020696143, 0.021972853111140975, 0.030170675984410696, 0.0904280338664158,
-    #            0.030069883080231154, 0.017672355866147026, 0.03937642789947588, 0.03156497782556108, 0.1183812659588765,
-    #            0.07880325225104153, 0.043290552345114905, 0.08557317564843435, 0.053369842763069476,
-    #            0.02183846257223492]
-    #
-    # original_blosum62 = {}
-    #
-    # blosum_matrix = np.zeros((20, 20))
-    # for i, aa in enumerate(original_blosum62.keys()):
-    #     sims = original_blosum62[aa]
-    #     for j, s in enumerate(sims):
-    #         blosum_matrix[i][j] = s
-    # u, V = LA.eig(blosum_matrix)
-    # clipped_u = u
-    # clipped_u[clipped_u < 0] = 0
-    # lamb = np.diag(clipped_u)
-    # T = V
-    # clip_blosum62 = {}
-    # for i, aa in enumerate(original_blosum62.keys()):
-    #     clip_blosum62[aa] = np.dot(np.sqrt(lamb), V[i])
-
     argparser = argparse.ArgumentParser()
     argparser.add_argument("--batch_size", default= 128, type=int)
     argparser.add_argument("--weight_decay", default=0.00005, type=float, help = "weight penalty")
@@ -213,14 +182,25 @@ if __name__ == '__main__':
     argparser.add_argument("--test", default=False, type=bool, help = "used for debug")
     argparser.add_argument("--device", default="cpu", type=str)
     argparser.add_argument("--optimizer", default="Adam", type=str)
+    argparser.add_argument("--expr_name", default=None, type=str, help = "can specify the feature of this training")
+    argparser.add_argument("--epoch", default=50, type=int)
     args = argparser.parse_args()
 
-    if args.test:
-        train_dataset = BinaryDataset(data_path="data/dataset/tmp.tsv")
-        val_dataset = BinaryDataset(data_path="data/dataset/tmp.tsv")
+    if args.embedding_type == "bio_emb":
+        encode = False
     else:
-        train_dataset = BinaryDataset(data_path="data/dataset/train.tsv")
-        val_dataset = BinaryDataset(data_path="data/dataset/val.tsv")
+        encode = True
+
+    if args.test:
+        train_dataset = BinaryDataset(data_path="data/dataset/tmp.tsv", encode= encode)
+        val_dataset = BinaryDataset(data_path="data/dataset/tmp.tsv", encode= encode)
+        epoch = 10
+        expr_name = "test"
+    else:
+        train_dataset = BinaryDataset(data_path="data/dataset/train.tsv", encode= encode)
+        val_dataset = BinaryDataset(data_path="data/dataset/val.tsv", encode= encode)
+        epoch = 50
+        expr_name = args.expr_name
     samples_weight = train_dataset.comp_weights()
     train_sampler = WeightedRandomSampler(samples_weight, len(samples_weight))  # how likely to draw sample from each class
 
@@ -228,16 +208,18 @@ if __name__ == '__main__':
     """  
     python train.py --batch_size 128 --embedding_type embedding --weight_decay 0.0005
     python train.py --batch_size 128 --embedding_type one_hot
-    python train.py --batch_size 128 --embedding_type one_hot --test True
+    python train.py --batch_size 128 --embedding_type bio_emb --device 0 --test True
+    python train.py --batch_size 32 --embedding_type embedding --device 1 --weight_decay 0.0005 --expr_name apt_dim_15_2
+    python train.py --batch_size 32 --embedding_type bio_emb --device 1 --weight_decay 0.0005 --expr_name apt_dim_15_2
     """
 
 
     """
     log for terminal
-    python train.py --batch_size 128 --embedding_type one_hot --device 0 --weight_decay 0.0005
-    python train.py --batch_size 128 --embedding_type embedding  --device 0 --weight_decay 0.0005
-    python train.py --batch_size 128 --embedding_type one_hot --device 1 --weight_decay 0.0001   # overfit
-    python train.py --batch_size 128 --embedding_type embedding  --device 1 --weight_decay 0.0001 --optimizer SGD
+    python train.py --batch_size 512 --embedding_type bio_emb --device 1 --weight_decay 0.0005 --expr_name apt_dim_15 # test larger batch size
+    python train.py --batch_size 32 --embedding_type bio_emb --device 1 --weight_decay 0.0005 --expr_name apt_dim_15_2 # test smaller batch size
+    # LSTM
+    CUDA_VISIBLE_DEVICES=1 python train.py --batch_size 256 --embedding_type bio_emb --device 0 --weight_decay 0.0005 --expr_name first_lstm # weight decay is too high
     """
 
     val_sampler = RandomSampler(val_dataset, replacement= False) # ensure a uniform display of accuracy during validation
@@ -249,15 +231,19 @@ if __name__ == '__main__':
     # TODO: make it support device list
     if args.device == "cpu":
         device = args.device
+    elif args.device == "parallel":
+        device = [0, 1]
     else:
         device = int(args.device)
     # device = "cpu"
     log_interval = 100
-    epoch = 200
+    # epoch = 200
     check_point = "./best_model_LinearTwoHead_one_hot.pt"
     check_point = None
     if check_point == None:
-        model = LinearTwoHead(args.embedding_type)
+        model = AptPepTransformer()
+        # model = RNNtwoHead(RNN_type = "LSTM", embedding_type = args.embedding_type)
+        # model = LinearTwoHead(args.embedding_type)
         # model = ConvTwoHead(args.embedding_type)
     else:
         with open(check_point, "r") as fp:

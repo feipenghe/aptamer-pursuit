@@ -157,15 +157,18 @@ def get_gen(num):
     # aa_list = ['R', 'L', 'S', 'A', 'G', 'P', 'T', 'V', 'N', 'D', 'C', 'Q', 'E', 'H', 'I', 'K', 'M', 'F', 'W',
     #            'Y']  # amino acids
 class BinaryDataset(Dataset):
-    def __init__(self, data_path,  dataset_type = 0):
+    def __init__(self, data_path,  encode = True, dataset_type = 0):
+        """
+        data path
+        dataset_type:
+            0: apt, pep, label
+            1: apt+pep, label
+        encode: whether encode aptamer. (Note that as we might not want to encode into digits because bio embedding which requires raw string list)
+        """
 
-        '''
-        :param sentence_data_path:
-        :param token_level:
-        :param unk_cutoff:
-        :param tokenizer_path:
-        :param tokenizer_training_path:  Both used for train the tokenizer and the model
-        '''
+        # add dataset type with raw input
+
+
         super().__init__()
 
         aptamers = []
@@ -218,8 +221,13 @@ class BinaryDataset(Dataset):
         self.aptamer_encode = dict({(v, k) for k,v in self.aptamer_decode.items()})
         self.peptide_encode = dict({(v, k) for k,v in self.peptide_decode.items()})
 
-        self.aptamers =  [self.encode_aptamer(a) for a in aptamers ]
-        self.peptides  = [self.encode_peptide(p) for p in peptides]
+        self.aptamers = [self.encode_aptamer(a) for a in aptamers]
+        if encode:
+            self.peptides  = [self.encode_peptide(p) for p in peptides]
+        else:
+            # import pdb
+            # pdb.set_trace()
+            self.peptides = peptides
         self.dataset_type =  dataset_type
         self.labels =  torch.tensor(labels)
     '''
@@ -286,9 +294,6 @@ class BinaryDataset(Dataset):
         return tokens
 
     def decode_peptide(self, indices):
-        # tokens = []
-        # for i in indices:
-        #     tokens.append(self.peptide_decode[i])
         return [self.peptide_decode[i] for i in indices]
 
 class RocDataset(Dataset):
