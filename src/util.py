@@ -163,6 +163,7 @@ class BinaryDataset(Dataset):
         dataset_type:
             0: apt, pep, label
             1: apt+pep, label
+            2: apt (with divider token), pep, label
         encode: whether encode aptamer. (Note that as we might not want to encode into digits because bio embedding which requires raw string list)
         """
 
@@ -170,6 +171,10 @@ class BinaryDataset(Dataset):
 
 
         super().__init__()
+        special_token = False
+        if dataset_type == 2:
+            special_token = True
+            encode = True
 
         aptamers = []
         peptides = []
@@ -207,6 +212,7 @@ class BinaryDataset(Dataset):
 
 
         na_list = ['A', 'C', 'G', 'T']  # nucleic acids
+        na_list += ['D'] # divider token
         aa_list = ['R', 'L', 'S', 'A', 'G', 'P', 'T', 'V', 'N', 'D', 'C', 'Q', 'E', 'H', 'I', 'K', 'M', 'F', 'W',
                    'Y']  # amino acids
         #enc_apt = OneHotEncoder()
@@ -221,7 +227,16 @@ class BinaryDataset(Dataset):
         self.aptamer_encode = dict({(v, k) for k,v in self.aptamer_decode.items()})
         self.peptide_encode = dict({(v, k) for k,v in self.peptide_decode.items()})
 
+
+        # TODO: add dataset type and set its corresponding configuration inside the dataset
+        if special_token:
+            aptamers = [a + 'D' for a in aptamers]
+
         self.aptamers = [self.encode_aptamer(a) for a in aptamers]
+
+
+
+
         if encode:
             self.peptides  = [self.encode_peptide(p) for p in peptides]
         else:
@@ -245,7 +260,7 @@ class BinaryDataset(Dataset):
     '''
 
     def __getitem__(self, index):
-        if self.dataset_type == 0:
+        if self.dataset_type == 0  or self.dataset_type == 2:
             return self.aptamers[index], self.peptides[index], self.labels[index]
         elif self.dataset_type == 1:
             return self.aptamers[index] + self.peptides[index], self.labels[index]
@@ -297,7 +312,7 @@ class BinaryDataset(Dataset):
         return [self.peptide_decode[i] for i in indices]
 
 class RocDataset(Dataset):
-    def __init__(self, data_path,  dataset_type = 0):
+    def __init__(self, data_path, encode, dataset_type = 0):
 
         '''
         :param sentence_data_path:
@@ -307,7 +322,10 @@ class RocDataset(Dataset):
         :param tokenizer_training_path:  Both used for train the tokenizer and the model
         '''
         super().__init__()
-
+        special_token = False
+        if dataset_type == 2:
+            special_token = True
+            encode = True
         aptamers = []
         peptides = []
         labels = []
@@ -351,6 +369,7 @@ class RocDataset(Dataset):
 
 
         na_list = ['A', 'C', 'G', 'T']  # nucleic acids
+        na_list += ["D"]
         aa_list = ['R', 'L', 'S', 'A', 'G', 'P', 'T', 'V', 'N', 'D', 'C', 'Q', 'E', 'H', 'I', 'K', 'M', 'F', 'W',
                    'Y']  # amino acids
         #enc_apt = OneHotEncoder()
@@ -364,10 +383,18 @@ class RocDataset(Dataset):
         self.peptide_decode = dict(enumerate(aa_list))
         self.aptamer_encode = dict({(v, k) for k,v in self.aptamer_decode.items()})
         self.peptide_encode = dict({(v, k) for k,v in self.peptide_decode.items()})
-
+        if special_token:
+            aptamers = [a + 'D' for a in aptamers]
         self.aptamers =  [self.encode_aptamer(a) for a in aptamers ]
-        self.peptides  = [self.encode_peptide(p) for p in peptides]
-        self.dataset_type =  dataset_type
+        if encode:
+            self.peptides  = [self.encode_peptide(p) for p in peptides]
+        else:
+            # import pdb
+            # pdb.set_trace()
+            self.peptides = peptides
+        # import pdb
+        # pdb.set_trace()
+        self.dataset_type = dataset_type
         self.labels =  torch.tensor(labels)
     '''
         self.aptamer_decode = dict(enumerate(na_list))
@@ -384,7 +411,7 @@ class RocDataset(Dataset):
     '''
 
     def __getitem__(self, index):
-        if self.dataset_type == 0:
+        if self.dataset_type == 0 or self.dataset_type == 2:
             return self.aptamers[index], self.peptides[index], self.labels[index]
         elif self.dataset_type == 1:
             return self.aptamers[index] + self.peptides[index], self.labels[index]
@@ -494,6 +521,8 @@ class AUCDataset(Dataset):
 
     def __getitem__(self, idx):
         return (self.bio_ds[idx], self.neg_ds[idx], self.gen_ds[idx])
+
+
 
 
 if __name__ == '__main__':

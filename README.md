@@ -30,15 +30,20 @@ Due to the structure difference between aptamers and peptides, encoding aptamers
 
 Based on this notion, we experiment linear model, convolution model and Long short-term memory(LSTM). We have two types of embedding, initialized embedding and pre-trained embedding from [the work using Transformer to predict masked amino acid](https://www.biorxiv.org/content/10.1101/622803v1.full.pdf) for peptides. We don't find any pre-trained aptamer embedding available.
 
-* **Linear** We initialized aptamers' embedding dimension to 4 and peptides' dimension to 20. The decision of embedding dimensions is based on their vocabulary size. First, aptamers are unlike words and have much richer structural information. Second, one-hot vector doesn't provides information other than distinction and embedding offers more flexibility. Also, we test the model performance for different dimensions. After getting the embedding, we pass embedding to multi-layer perceptron and finally output a value of binding probability.
+* **Linear** We initialized aptamers' embedding dimension to 4 and peptides' dimension to 20. The decision of embedding dimensions is based on their vocabulary size. First, aptamers are unlike words and have much richer structural information. We expect it needs much higher dimensions and stress the . Second, one-hot vector doesn't provides information other than distinction and embedding offers more flexibility. Also, we test the model performance for different dimensions. After getting the embedding, we pass embedding to multi-layer perceptron and finally output a value of binding probability.
 * **ConvNet** We initialized aptamers' embedding dimension to 4 and peptides' dimension to 20, same as in linear model. Aptamers and peptides sequences are fed into two separate convolutional layers with kernel size 4. The outputs of the two convolutional layers are then concatenated and classified using two fully connected layers.
-* **LSTM** In this model, we initialized the embedding dimension of aptamers to 16 and use pre-trained peptide embedding of dimension (3, 1024). We run two LSTMs as two encoders and obtain two hidden states. We set the hidden dimensions of the aptamer encoder and the peptide encoder to 100 and 300 separately. We then pass the final hidden state to a fully connected layer and output a probability of binding. In this experimental work, we only run the model for 10 epochs due to slow computation resulting from large embedding dimension.
+* **LSTM** In this model, we initialized the embedding dimension of aptamers to 16 and use pre-trained peptide embedding of dimension (3, 1024). We run two LSTMs as two encoders and obtain two hidden states. We set the hidden dimensions of the aptamer encoder and the peptide encoder to 100 and 300 separately. We then pass the final hidden state to a fully connected layer and output a probability of binding. In this experimental work, we only run the model for 10 epochs due to slow computation resulting from large embedding dimension and more computations required by LSTM compared to other RNN variants.
+* **Transformer** In this model, we initialized the embedding with dimension 1024 for both aptamers and peptides. We designed a Transformer with two heads and two layers of transformer encoders.  Then we pass the output of the transformer to two linear layers and output the predictions.  
 
-
+For the purpose of comparing models' performance in the classification task, we use a uniform set of experiment settings. We set batch size to 512, learning rate to 0.00035, weight decay factor to 0.00005 and use Adam optimizer.
 
 ## Result
-### ROC Curve
-We measure the performance of our models using receiver operating characteristic (ROC) curve. We test our model using positive, negative and generated data. The ROC curve shows that the performance of the three models are very similar. 
 
+### ROC Curve
+We measure the performance of our models using receiver operating characteristic (ROC) curve. We test our model using positive, negative and generated data. The ROC curve shows that the performance of the four models are very similar, and transformer shows a slight better classification power for threshold larger than 0.5. 
+### Emebedding
+We don't find the significance of pre-trained embeddings and initialized embeddings. However, during preliminary experiments, we find that initialized embeddings are more powerful than one-hot embeddings. Therefore, we use embeddings for most experiments shown here.
+
+### 
 
 <img src="./fig/roc.png" />

@@ -274,8 +274,10 @@ class LinearTwoHead(nn.Module):
         self.single_alphabet=False
         self.apt_vocab_size = 4
         self.pep_vocab_size = 20
-        self.apt_embedding_dim = self.apt_vocab_size * 4
-        self.pep_embedding_dim = 1024
+        self.apt_embedding_dim = self.apt_vocab_size  # * 4
+        self.pep_embedding_dim = 1024 if embedding_type == "bio_emb" else self.pep_vocab_size
+        # import pdb
+        # pdb.set_trace()
         self.apt_length = 40
         self.pep_length = 8
 
@@ -297,7 +299,7 @@ class LinearTwoHead(nn.Module):
 
         # pep_dim = self.pep_embedding_dim * self.pep_length
         BIO_EMB_DIM = 1024
-        pep_dim = BIO_EMB_DIM * 3
+        pep_dim = BIO_EMB_DIM * 3 if embedding_type == "bio_emb" else self.pep_vocab_size * self.pep_length
         self.fc_pep_1 = nn.Linear(pep_dim, pep_dim*2)
         self.fc_pep_2 = nn.Linear(pep_dim*2, 100)
         
@@ -426,8 +428,8 @@ class RNNtwoHead(nn.Module):
         # pep = self.fc_pep(pep)
         # import pdb
         # pdb.set_trace()
-        apt_hidden = apt_hidden.squeeze()
-        pep_hidden = pep_hidden.squeeze()
+        apt_hidden = apt_hidden.squeeze(1)
+        pep_hidden = pep_hidden.squeeze(1)
         x = torch.cat((apt_hidden, pep_hidden), 1)
         x = self.fc(x)
         return x
@@ -451,53 +453,101 @@ class PositionalEncoding(nn.Module):
         self.register_buffer('pe', pe)
 
     def forward(self, x):
-        #         x = x + self.pe[:x.size(0), :]
-        #         print("x in forward: ", x.shape)
+        # TODO: check dimension
         x = x.permute(1, 0, 2)
         # seq len x batch x embedding size
-        #         print("x: ", x.shape)
-        #         print(" self.pe[:, :x.size(0)]: ",  self.pe[:, :x.size(0)].shape)
+
         x = x + self.pe[:x.size(0), :]
         return self.dropout(x)
 
 
 import math
-#
-#
-#
+
+
+
 class AptPepTransformer(nn.Module):
-    def __init__(self, vocab_size, feature_size):
+    """
+    Encoder structure.
+    Encoder the sequence into (head x
+    """
+    def __init__(self, vocab_size = 4+1, feature_size= 1024):
         super(AptPepTransformer, self).__init__()
-        self.vocab_size = vocab_size
+        self.name = "AptPepTransformer"
+        self.vocab_size = vocab_size  # it aptamer vocab size
         self.feature_size = feature_size
-        self.encoder = nn.Embedding(self.vocab_size, self.feature_size)  # they should share the same encoder
+        self.apt_encoder = nn.Embedding(self.vocab_size, self.feature_size)  # they should share the same encoder
+
+        aa_list = ['R', 'L', 'S', 'A', 'G', 'P', 'T', 'V', 'N', 'D', 'C', 'Q', 'E', 'H', 'I', 'K', 'M', 'F', 'W', 'Y']
+        # embedder = ProtTransBertBFDEmbedder()
+        # embedding_weights = np.concatenate([embedder.embed(p) for p in aa_list], axis = 0)
+        # embedding_weights = torch.from_numpy(embedding_weights)
+        self.pep_encoder = nn.Embedding(len(aa_list), self.feature_size)
+        # self.pep_encoder = nn.Embedding.from_pretrained(embedding_weights)
+        # self.pep_encoder.
+
+
         #         self.tgt_encoder = nn.Embedding(self.vocab_size, self.feature_size)
 
+        # TODO: encode both of them with a special token divide them
         # TODO: another dimentions = self.embed_src(src) * math.sqrt(self.d_model)
+        # TODO: check method of decoding
+
         self.pos_encoder = PositionalEncoding(self.feature_size)  # simple argument setting
-        encoder_layers = nn.TransformerEncoderLayer(self.feature_size, nhead=4)
-        self.transformer_encoder = nn.TransformerEncoder(encoder_layers, num_layers=6)
-        self.decoder = nn.Linear(self.feature_size, self.vocab_size)
+        encoder_layers = nn.TransformerEncoderLayer(self.feature_size, nhead=2)
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layers, num_layers=2)
+
+
+        # decoder_layers = nn.TransformerDecoderLayer(self.feature_size, nhead = 2)
+        # self.decoder = nn.TransformerDecoder(decoder_layers, num_layers=2)
+        self.decoder = nn.Sequential(nn.Linear(self.feature_size, 1), nn.Linear(49, 1), nn.Sigmoid())
+
+        self.decoder1 = nn.Linear(self.feature_size, 1)
+        self.decoder2 = nn.Linear(49, 1)
+
 
         # This shares the encoder and decoder weights as described in lecture.
-        self.decoder.weight = self.encoder.weight
-        self.decoder.bias.data.zero_()
+
+        # self.decoder[0].weight = self.encoder.weight # weight sharing happens in
+        # self.decoder[0].bias.data.zero_()
+
+            # self.decoder.weight = self.encoder.weight
+            # self.decoder.bias.data.zero_()
 
         self.best_accuracy = -1
 
-    def forward(self, src, src_mask, tgt=None):  # hidden_state=None, cell_state = None
+    def forward(self, apt, pep, src_mask=None, tgt=None):  # hidden_state=None, cell_state = None
+
+        # scale embedding with their feature size
+
+        apt = self.apt_encoder(apt) * math.sqrt(self.feature_size)
+        pep = self.pep_encoder(pep) * math.sqrt(self.feature_size)
+
+        src = torch.cat((apt, pep), dim = 1)
         batch_size = src.shape[0]
         sequence_length = src.shape[1]
 
         # TODO finish defining the forward pass.
         # You should return the output from the decoder as well as the hidden state given by the gru.
-        src = self.encoder(src) * math.sqrt(self.feature_size)  # TOTHINK: why math.sqrt(self.feature_size) here
+        # src = self.encoder(src) * math.sqrt(self.feature_size)  # TOTHINK: why math.sqrt(self.feature_size) here
         src = self.pos_encoder(src)
         #         print("data in transformer: ", src.shape)
         #         print('mask in transformer: ', src_mask.shape)
-        output = self.transformer_encoder(src, src_mask)
 
-        output = self.decoder(output)  # TODO: shouldn't it predict a single character
+
+
+        output = self.transformer_encoder(src, src_mask) # encoded representation
+        output = output.permute(1, 0, 2).contiguous() # batch size x seq len x feature size
+
+        # output = output.view(output.size(0), -1)
+        # import pdb
+        # pdb.set_trace()
+        output = self.decoder1(output) # use encoded representations to predict binding
+        output = output.squeeze()
+        output = self.decoder2(output)
+        output = nn.functional.sigmoid(output)
+
+        # import pdb
+        # pdb.set_trace()
 
         # 100, 256, 512
         # seq len, batch size, feature size
@@ -519,7 +569,6 @@ class AptPepTransformer(nn.Module):
 
     def generate_square_subsequent_mask(self, sz):
         mask = (torch.triu(torch.ones(sz, sz)) == 1).transpose(0, 1)
-
         mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
         return mask
 
@@ -535,7 +584,7 @@ class AptPepTransformer(nn.Module):
         # after forward, seq len x batch x embedding
         x = x[-1, :, :]  # take last character output   # TODO: it shouldn't predict a single character
         x = x / max(temperature, 1e-20)
-        x = F.softmax(x, dim=1)
+        # x = F.softmax(x, dim=1)
 
         return x
 
@@ -543,7 +592,8 @@ class AptPepTransformer(nn.Module):
     def loss(self, prediction, label, reduction='mean'):
         loss_val = F.cross_entropy(prediction.view(-1, self.vocab_size), label.view(-1), reduction=reduction)
         return loss_val
-
+    def accuracy(self, predictions, labels):
+        return (torch.sum((predictions > 0.5) == labels).item()/len(labels))
     # Saves the current model
     def save_model(self, file_path, num_to_keep=1):
         pt_util.save(self, file_path, num_to_keep)
